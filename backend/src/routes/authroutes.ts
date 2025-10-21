@@ -5,6 +5,7 @@ import nodemailer from "nodemailer";
 import { authenticate } from "../middleware/auth";
 import User from "../models/user";
 import { sendEmail } from "../utils/sendEmail";
+import { generateUsername } from "../utils/uniqueUsername";
 
 // Define AuthRequest type to include userId
 interface AuthRequest extends Request {
@@ -19,25 +20,41 @@ const router = express.Router();
  */
 router.post("/register", async (req: Request, res: Response) => {
   try {
-    const { username, email, password } = req.body;
+    const { name, email, password } = req.body;
 
+    // 1️⃣ Validate fields
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    // 2️⃣ Check if user already exists
     const existingUser = await User.findOne({ email });
-    if (existingUser)
+    if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
+    }
 
+    // 3️⃣ Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
+
+    // 4️⃣ Generate verification code
     const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
 
+    // 5️⃣ Generate a unique username
+    const username = generateUsername(name);
+
+    // 6️⃣ Create new user
     const newUser = new User({
-      username,
+      name,
       email,
       password: hashedPassword,
       verificationCode,
       isVerified: false,
+      username, // ✅ Now it is unique
     });
+
     await newUser.save();
 
-    // ✉️ Send email
+    // 7️⃣ Send email
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -53,9 +70,11 @@ router.post("/register", async (req: Request, res: Response) => {
       text: `Your verification code is ${verificationCode}`,
     });
 
+    // 8️⃣ Respond
     res.status(201).json({
       message: "User registered successfully. Verification code sent to email.",
       email,
+      username, // optional: return generated username
     });
   } catch (error) {
     console.error(error);
@@ -148,19 +167,28 @@ router.post("/login", async (req: Request, res: Response) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET!, {
       expiresIn: "7d",
     });
+    console.log("JWT_SECRET:", process.env.JWT_SECRET);
 
-    res.json({
+    // Return essential profile info for client-side usage
+    res.status(200).json({
       message: "Login successful",
       token,
       user: {
         id: user._id,
+        name: user.username,
         username: user.username,
         email: user.email,
+        avatar: user.avatar || null,
+        bio: user.bio || "",
+        phone: user.phone || "",
+        gender: user.gender || "",
+        dateOfBirth: user.dateOfBirth || null,
+        isVerified: user.isVerified,
       },
     });
   } catch (error) {
     console.error("Login error:", error);
-    res.status(500).json({ message: "Server error", error });
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -177,4 +205,91 @@ router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: "Server error", error: err });
   }
 });
+
+// Update user profile
+router.put("/update-profile", authenticate, async (req: any, res) => {
+  try {
+    const { name, username, bio, avatar, phone, gender, dateOfBirth } =
+      req.body;
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.userId,
+      { name, username, bio, avatar, phone, gender, dateOfBirth },
+      { new: true }
+    ).select("-password -__v");
+
+    res.json(updatedUser);
+  } catch (err) {
+    res.status(500).json({ message: "Error updating profile", error: err });
+  }
+});
+
+/**
+ * @route GET /users
+ * @desc Get all users except the logged-in user
+ */
+router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: "Unauthorized" });
+
+    // Fetch all users except the current user
+    const users = await User.find({ _id: { $ne: req.userId } }).select(
+      "_id name username avatar following"
+    );
+
+    res.json(users);
+  } catch (err) {
+    console.error("Fetch users error:", err);
+    res.status(500).json({ message: "Server error", error: err });
+  }
+});
+
+/**
+ * @route POST /users/follow/:id
+ * @desc Follow a user
+ */
+router.post(
+  "/follow/:id",
+  authenticate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const targetUserId = req.params.id;
+      if (req.userId === targetUserId)
+        return res.status(400).json({ message: "Cannot follow yourself" });
+
+      await User.findByIdAndUpdate(req.userId, {
+        $addToSet: { following: targetUserId },
+      });
+
+      res.json({ message: "User followed" });
+    } catch (err) {
+      console.error("Follow error:", err);
+      res.status(500).json({ message: "Server error", error: err });
+    }
+  }
+);
+
+/**
+ * @route POST /users/unfollow/:id
+ * @desc Unfollow a user
+ */
+router.post(
+  "/unfollow/:id",
+  authenticate,
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const targetUserId = req.params.id;
+
+      await User.findByIdAndUpdate(req.userId, {
+        $pull: { following: targetUserId },
+      });
+
+      res.json({ message: "User unfollowed" });
+    } catch (err) {
+      console.error("Unfollow error:", err);
+      res.status(500).json({ message: "Server error", error: err });
+    }
+  }
+);
+
 export default router;
