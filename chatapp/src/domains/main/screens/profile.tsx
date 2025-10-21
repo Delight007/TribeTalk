@@ -1,16 +1,62 @@
 import Ionicons from '@react-native-vector-icons/ionicons';
-import React from 'react';
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCurrentUser } from '../../../api/auth';
 import { useTheme } from '../../../shared/contexts/themeContext';
 import BottomNavigator from '../components/bottomNavigator';
 
 const Profile = ({ navigation }: any) => {
   const { theme, toggleTheme } = useTheme();
+  const [selectedTab, setSelectedTab] = useState<'Posts' | 'Reels' | 'Tagged'>(
+    'Posts',
+  );
 
-  const highlights: any[] = [];
-  const posts: any[] = [];
+  const { data: user, isLoading, error } = useCurrentUser();
+
+  const highlights = [
+    { id: '1', name: 'Trips', uri: 'https://placekitten.com/100/100' },
+    { id: '2', name: 'Cars', uri: 'https://placekitten.com/101/101' },
+  ];
+
+  const posts = Array.from({ length: 12 }).map((_, i) => ({
+    id: i.toString(),
+    uri: `https://placekitten.com/${100 + i}/${100 + i}`,
+  }));
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 justify-center items-center bg-black/5">
+        <ActivityIndicator size="large" color="#0095F6" />
+        <Text className="mt-2 text-gray-500">Loading profile...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View className="flex-1 justify-center items-center bg-black/5 px-6">
+        <Text className="text-red-500 text-center mb-3">
+          Failed to load profile: {error.message}
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          className="bg-green-600 px-4 py-2 rounded-full"
+        >
+          <Text className="text-white font-semibold">Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <LinearGradient
@@ -37,7 +83,7 @@ const Profile = ({ navigation }: any) => {
                 theme === 'dark' ? 'text-white' : 'text-black'
               }`}
             >
-              audi
+              {user?.username || 'Username'}
             </Text>
             <Ionicons name="checkmark-circle" size={16} color="#3b82f6" />
           </View>
@@ -50,26 +96,25 @@ const Profile = ({ navigation }: any) => {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false}>
-          {/* Profile section */}
-          <View className="flex-row items-start gap-4 mb-4 mt-2">
-            {/* Profile Picture */}
-            <View className="relative">
-              <LinearGradient
-                colors={['#facc15', '#ec4899', '#8b5cf6']}
-                className="w-20 h-20 rounded-full p-1"
-              >
-                <View className="bg-black rounded-full flex-1 items-center justify-center">
-                  <Ionicons name="car-sport-outline" size={40} color="#fff" />
-                </View>
-              </LinearGradient>
-            </View>
+          {/* Profile Info */}
+          <View className="flex-row items-center justify-between mb-4 mt-2">
+            {user?.avatar ? (
+              <Image
+                source={{ uri: user.avatar }}
+                className="w-[90px] h-[90px] rounded-full"
+              />
+            ) : (
+              <View className="w-[90px] h-[90px] rounded-full bg-gray-400 items-center justify-center">
+                <Ionicons name="person-outline" size={40} color="#fff" />
+              </View>
+            )}
 
             {/* Stats */}
             <View className="flex-1 flex-row justify-around text-center">
               {[
-                { label: 'publicações', value: '0' },
-                { label: 'seguidores', value: '0' },
-                { label: 'seguindo', value: '0' },
+                { label: 'Posts', value: posts.length.toString() },
+                { label: 'Followers', value: user?.followers?.length || '0' },
+                { label: 'Following', value: user?.following?.length || '0' },
               ].map((stat, index) => (
                 <View key={index} className="items-center">
                   <Text
@@ -98,127 +143,96 @@ const Profile = ({ navigation }: any) => {
                 theme === 'dark' ? 'text-white' : 'text-black'
               }`}
             >
-              Audi
+              {user?.name || user?.username || 'User'}
             </Text>
             <Text
               className={`text-sm leading-relaxed ${
                 theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
               }`}
             >
-              Innovating the road ahead | Be part of progress | {'\n'}
-              #VorsprungDurchTechnik
+              {user?.bio || 'No bio yet.'}
             </Text>
           </View>
 
-          {/* Action Buttons */}
+          {/* Buttons */}
           <View className="flex-row gap-2 mb-4">
-            <TouchableOpacity className="flex-1 bg-[#1a2a22] rounded-full py-2 items-center">
-              <View className="flex-row items-center">
-                <Text className="text-white font-semibold text-sm mr-1">
-                  Seguindo
-                </Text>
-                <Ionicons name="chevron-down" color="#fff" size={14} />
-              </View>
+            <TouchableOpacity
+              className="flex-1 bg-[#1a2a22] rounded-full py-2 items-center"
+              onPress={() => navigation.navigate('EditProfile')}
+            >
+              <Text className="text-white font-semibold text-sm">
+                Edit Profile
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="flex-1 bg-[#1a2a22] rounded-full py-2 items-center">
-              <Text className="text-white font-semibold text-sm">Mensagem</Text>
+              <Text className="text-white font-semibold text-sm">
+                Share Profile
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity className="bg-[#1a2a22] rounded-full py-2 px-3 items-center justify-center">
-              <Ionicons name="close" size={14} color="#fff" />
+              <Ionicons name="person-add-outline" size={16} color="#fff" />
             </TouchableOpacity>
           </View>
 
           {/* Highlights */}
-          {highlights.length === 0 ? (
-            <View className="items-center mb-6">
-              <Text
-                className={`text-sm italic ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                }`}
-              >
-                No highlights yet
-              </Text>
-            </View>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              className="mb-4"
-            >
-              {highlights.map((highlight, i) => (
-                <View key={i} className="items-center mr-4">
-                  <View className="w-16 h-16 rounded-full border-2 border-gray-600 overflow-hidden mb-1">
-                    <Image
-                      source={highlight.image}
-                      className="w-full h-full rounded-full"
-                      resizeMode="cover"
-                    />
-                  </View>
-                  <Text
-                    className={`text-xs ${
-                      theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
-                    }`}
-                  >
-                    {highlight.name}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-
-          {/* Posts */}
-          {posts.length === 0 ? (
-            <View className="items-center mt-6">
-              <Ionicons
-                name="images-outline"
-                size={48}
-                color={theme === 'dark' ? '#555' : '#aaa'}
-              />
-              <Text
-                className={`text-sm italic mt-2 ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                }`}
-              >
-                No posts yet
-              </Text>
-            </View>
-          ) : (
-            <View className="flex-row flex-wrap justify-between">
-              {posts.map((post, i) => (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="mb-4"
+          >
+            {highlights.map(highlight => (
+              <View key={highlight.id} className="items-center mr-4">
                 <Image
-                  key={i}
-                  source={post}
-                  className="w-[32%] aspect-square mb-1 rounded-sm"
-                  resizeMode="cover"
+                  source={{ uri: highlight.uri }}
+                  className="w-16 h-16 rounded-full border-2 border-gray-600 mb-1"
                 />
-              ))}
-            </View>
-          )}
-        </ScrollView>
+                <Text
+                  className={`text-xs ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+                  }`}
+                >
+                  {highlight.name}
+                </Text>
+              </View>
+            ))}
+          </ScrollView>
 
-        {/* Bottom Navigation */}
-        <View className="flex-row justify-around py-3 border-t border-gray-700 mt-auto">
-          <Ionicons
-            name="home-outline"
-            size={24}
-            color={theme === 'dark' ? '#fff' : '#000'}
-          />
-          <Ionicons
-            name="search-outline"
-            size={24}
-            color={theme === 'dark' ? '#fff' : '#000'}
-          />
-          <Ionicons
-            name="film-outline"
-            size={24}
-            color={theme === 'dark' ? '#fff' : '#000'}
-          />
-          <View className="w-7 h-7 rounded-full border-2 border-white items-center justify-center">
-            <Ionicons name="person-outline" size={16} color="#fff" />
+          {/* Tabs */}
+          <View className="flex-row justify-around border-t border-gray-300 mb-2">
+            {['Posts', 'Reels', 'Tagged'].map(tab => (
+              <TouchableOpacity
+                key={tab}
+                onPress={() => setSelectedTab(tab as any)}
+                className="py-2 flex-1 items-center"
+              >
+                <Text
+                  className={`font-semibold ${
+                    selectedTab === tab
+                      ? 'text-black dark:text-white'
+                      : 'text-gray-500'
+                  }`}
+                >
+                  {tab}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
-        </View>
+
+          {/* Posts Grid */}
+          <FlatList
+            data={posts}
+            keyExtractor={item => item.id}
+            numColumns={3}
+            renderItem={({ item }) => (
+              <Image
+                source={{ uri: item.uri }}
+                className="w-[32%] aspect-square mb-1 rounded-sm"
+              />
+            )}
+          />
+        </ScrollView>
 
         {/* Theme Toggle */}
         <TouchableOpacity onPress={toggleTheme} className="mt-3 mb-4">

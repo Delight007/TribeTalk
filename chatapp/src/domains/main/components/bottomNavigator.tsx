@@ -57,12 +57,16 @@ const BottomNavigator = ({ active }: { active?: string }) => {
         className={`w-12 h-12 rounded-full items-center justify-center shadow-lg
           ${theme === 'dark' ? 'bg-green-500' : 'bg-green-700'}
         `}
+        onPress={() => navigation.navigate('AppUsers')}
       >
         <Ionicons name="add" size={26} color="#ffffff" />
       </TouchableOpacity>
 
       {/* Likes */}
-      <TouchableOpacity className="items-center">
+      <TouchableOpacity
+        className="items-center"
+        onPress={() => navigation.navigate('Settings')}
+      >
         <Ionicons
           name="heart-outline"
           size={24}

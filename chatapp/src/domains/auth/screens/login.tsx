@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState } from 'react';
 import {
   Alert,
@@ -11,29 +12,49 @@ import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLogin } from '../../../api/auth';
 import { useTheme } from '../../../shared/contexts/themeContext';
+import { useAuthStore } from '../../../shared/global/authStore';
+import { useUserStore } from '../../../shared/global/userStore';
 
 const Login = ({ navigation }: any) => {
-  const { theme, toggleTheme } = useTheme(); // 🌗 Access current theme + toggle function
+  const { theme, toggleTheme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const loginMutation = useLogin();
-  const handleLogin = () => {
+  const setUserToken = useAuthStore(state => state.setUserToken); // ✅ Zustand action
+  // inside your Login component:
+  // const setToken = useAuthStore(state => state.setToken);
+  const setCurrentUser = useUserStore(state => state.setCurrentUser);
+
+  const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
+
     loginMutation.mutate(
       { email, password },
       {
-        onSuccess: response => {
-          Alert.alert('success', 'Logged in Successful ');
-          navigation.navigate('FeedScreen');
+        onSuccess: async response => {
+          console.log('Full login response:', response);
+
+          if (response?.token && response?.user) {
+            // ✅ Save token
+            await AsyncStorage.setItem('token', response.token);
+            setUserToken(response.token);
+
+            // ✅ Save user data in userStore
+            setCurrentUser(response.user);
+
+            Alert.alert('Success', 'Logged in successfully!');
+          } else {
+            Alert.alert('Error', 'Invalid server response');
+          }
         },
         onError: (error: any) => {
           Alert.alert(
             'Error',
-            error.response?.data.messsage || 'invalid credentials',
+            error.response?.data?.message || 'Invalid credentials',
           );
         },
       },

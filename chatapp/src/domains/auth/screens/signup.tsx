@@ -27,7 +27,7 @@ const Signup = ({ navigation }: any) => {
     }
 
     try {
-      await signupMutation.mutateAsync({ username: name, email, password });
+      await signupMutation.mutateAsync({ name, email, password });
       Alert.alert('Success', 'Verification code sent to your email');
       navigation.navigate('ConfirmationCode', { email }); // 👈 pass email here
     } catch (error: any) {

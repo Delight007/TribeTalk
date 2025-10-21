@@ -2,7 +2,9 @@ import Ionicons from '@react-native-vector-icons/ionicons';
 import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
+  Image,
   Text,
   TextInput,
   TouchableOpacity,
@@ -10,50 +12,40 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useCurrentUser, useFriends } from '../../../api/auth';
 import { useTheme } from '../../../shared/contexts/themeContext';
 import BottomNavigator from '../components/bottomNavigator';
 
-const stories = [
-  { id: '1', name: 'Olivia' },
-  { id: '2', name: 'Daniel' },
-  { id: '3', name: 'Sophia' },
-  { id: '4', name: 'William' },
-  { id: '5', name: 'Henry' },
-];
+type Friend = {
+  _id: string;
+  name: string;
+  avatar?: string;
+  email?: string;
+  username?: string;
+};
 
-const messages = [
-  { id: '1', name: 'Charlotte', text: 'Hey, mate please ...', time: '29 Jun' },
-  {
-    id: '2',
-    name: 'Arafat Khan',
-    text: 'https://linkedin.com/post/…',
-    time: '28 Jun',
-  },
-  {
-    id: '3',
-    name: 'Ajoy Mondal',
-    text: 'https://behance.net/gallery/…',
-    time: '26 Jun',
-  },
-  { id: '4', name: 'Patricia', text: 'Short update', time: '24 Jun' },
-  { id: '5', name: 'Isabella', text: 'Sent you an attachment', time: '20 Jun' },
-  {
-    id: '6',
-    name: 'John Mendala',
-    text: 'The audio call ended',
-    time: '20 Jun',
-  },
+const activefriends: Friend[] = [
+  { _id: '1', name: 'Olivia' },
+  { _id: '2', name: 'Daniel' },
+  { _id: '3', name: 'Sophia' },
+  { _id: '4', name: 'William' },
+  { _id: '5', name: 'Henry' },
 ];
 
 export default function FriendsList() {
   const { theme } = useTheme();
   const [query, setQuery] = useState('');
   const navigation = useNavigation<any>();
+  const { data: user } = useCurrentUser();
+  const { data: friends, isLoading, isError } = useFriends();
+
+  console.log('Friends data:', friends);
 
   const isDark = theme === 'dark';
   const textColor = isDark ? 'text-white' : 'text-[#1a2a22]';
   const subText = isDark ? 'text-gray-400' : 'text-gray-600';
-  const bgColor = isDark ? 'bg-[#1a2a22]' : 'bg-gray-100';
+  const bgColor = isDark ? 'bg-[#1a2a22]' : 'bg-gray-100/60';
+  const profilebg = isDark ? 'bg-green-900' : 'bg-gray-200';
 
   return (
     <LinearGradient
@@ -67,14 +59,25 @@ export default function FriendsList() {
       end={{ x: 1, y: 1 }}
       className="flex-1"
     >
-      <SafeAreaView className="">
+      <SafeAreaView>
         {/* Header */}
         <View className="flex-row justify-between items-center px-6 py-6">
           <View className="flex-row items-center">
-            <View
-              className={`w-12 h-12 rounded-full bg-gray-100 dark:bg-green-900 items-center justify-center mr-2`}
-            >
-              <Text className={`font-semibold ${textColor}`}>L</Text>
+            <View className="border-2 border-green-600 rounded-full p-2 mr-4">
+              <View
+                className={`w-12 h-12 rounded-full bg-gray-100 dark:bg-green-900 items-center justify-center`}
+              >
+                {user?.avatar ? (
+                  <Image
+                    source={{ uri: user.avatar }}
+                    className="w-[50px] h-[50px] rounded-full"
+                  />
+                ) : (
+                  <View className="w-[50px] h-[50px] rounded-full bg-gray-400 items-center justify-center">
+                    <Ionicons name="person-outline" size={40} color="#fff" />
+                  </View>
+                )}
+              </View>
             </View>
             <Text className={`text-xl font-bold ${textColor}`}>Messages</Text>
           </View>
@@ -88,9 +91,9 @@ export default function FriendsList() {
         </View>
 
         {/* Search Bar */}
-        <View className="px-6 ">
+        <View className="px-6">
           <View
-            className={`flex-row items-center rounded-full px-3 ${bgColor}`}
+            className={`flex-row items-center border border-green-600 rounded-full px-3 ${bgColor}`}
           >
             <Ionicons
               name="search"
@@ -107,10 +110,10 @@ export default function FriendsList() {
           </View>
         </View>
 
-        {/* Stories */}
+        {/* Active friends */}
         <FlatList
-          data={stories}
-          keyExtractor={i => i.id}
+          data={activefriends}
+          keyExtractor={i => i._id}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 24 }}
@@ -118,47 +121,75 @@ export default function FriendsList() {
           renderItem={({ item }) => (
             <View className="items-center mr-5">
               <View
-                className={`w-16 h-16 rounded-full bg-green-200 dark:bg-green-900 items-center justify-center`}
+                className={`w-16 h-16 rounded-full items-center justify-center ${profilebg}`}
               >
-                <Text className={`font-semibold ${textColor}`}>
-                  {item.name[0]}
-                </Text>
+                {item.avatar ? (
+                  <Image
+                    source={{ uri: item.avatar }}
+                    className="w-16 h-16 rounded-full"
+                  />
+                ) : (
+                  <View className="w-16 h-16 rounded-full border-green-600 border-2 p-1 items-center justify-center">
+                    <View className="bg-green-400 rounded-full w-full h-full items-center justify-center">
+                      <Ionicons name="person-outline" size={20} color="#fff" />
+                    </View>
+                  </View>
+                )}
               </View>
               <Text className={`text-xs mt-1 ${textColor}`}>{item.name}</Text>
             </View>
           )}
         />
 
-        {/* Messages */}
-        <FlatList
-          data={messages}
-          keyExtractor={i => i.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16 }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => navigation.navigate('ChatScreen', { user: item })}
-              className={`flex-row items-center py-3  ${isDark ? 'border-gray-700' : 'border-gray-300'}`}
-            >
-              <View
-                className={`w-14 h-14 rounded-full bg-green-300 dark:bg-green-800 items-center justify-center mr-3`}
-              >
-                <Text className={`font-bold ${textColor}`}>{item.name[0]}</Text>
-              </View>
-              <View className="flex-1">
-                <View className="flex-row justify-between items-center">
-                  <Text className={`font-semibold ${textColor}`}>
-                    {item.name}
-                  </Text>
-                  <Text className={`text-xs ${subText}`}>{item.time}</Text>
-                </View>
-                <Text className={`text-sm mt-1 ${subText}`} numberOfLines={1}>
-                  {item.text}
-                </Text>
-              </View>
-            </TouchableOpacity>
+        {/* Friend List (replaces messages) */}
+        <View className="px-4">
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#16a34a" />
+          ) : isError ? (
+            <Text className={`text-center text-white mt-4 ${textColor}`}>
+              Failed to load friends
+            </Text>
+          ) : friends?.length === 0 ? (
+            <Text className={`text-center mt-4 ${textColor}`}>
+              No friends yet 😢
+            </Text>
+          ) : (
+            <FlatList
+              data={friends}
+              keyExtractor={item => item._id}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  onPress={() =>
+                    navigation.navigate('ChatScreen', { user: item })
+                  }
+                  className="flex-row items-center py-3"
+                >
+                  <View
+                    className={`w-14 h-14 rounded-full bg-green-300 dark:bg-green-800 items-center justify-center mr-3`}
+                  >
+                    {item.avatar ? (
+                      <Image
+                        source={{ uri: item.avatar }}
+                        className="w-14 h-14 rounded-full"
+                      />
+                    ) : (
+                      <Ionicons name="person-outline" size={24} color="#fff" />
+                    )}
+                  </View>
+                  <View className="flex-1">
+                    <Text className={`font-semibold ${textColor}`}>
+                      {item.name}
+                    </Text>
+                    <Text className={`text-sm ${subText}`}>
+                      {item.email || item.username || 'Tap to chat'}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
           )}
-        />
+        </View>
       </SafeAreaView>
 
       {/* Bottom navigator */}

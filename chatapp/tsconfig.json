@@ -4,9 +4,7 @@
     "**/*.ts",
     "**/*.tsx",
     "nativewind-env.d.ts"
+    // "react-native-linear-gradient.d.ts"
   ],
-  "exclude": [
-    "**/node_modules",
-    "**/Pods"
-  ]
+  "exclude": ["**/node_modules", "**/Pods"]
 }

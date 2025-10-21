@@ -1,69 +1,66 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, View } from 'react-native';
+
+import { useAuthStore } from '../../shared/global/authStore';
+import { RootStackParamList } from '../../types/navigation';
 import ConfirmationCode from '../auth/screens/confirmationCode';
 import LoginScreen from '../auth/screens/login';
-import SignupScreen from '../auth/screens/signup'; // 👈 add this import
+import SignupScreen from '../auth/screens/signup';
 import ChatScreen from '../main/screens/chat';
+import EditProfile from '../main/screens/editPage';
 import FeedScreen from '../main/screens/feeds';
 import FriendsList from '../main/screens/friends';
 import Profile from '../main/screens/profile';
+import SettingsScreen from '../main/screens/settings';
+import AppUsers from '../main/screens/users';
+import VideoCall from '../main/screens/videoCall';
 
-const Stack = createNativeStackNavigator();
+// const Stack = createNativeStackNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
-const AppNavigator = () => (
-  <Stack.Navigator
-    screenOptions={{
-      headerStyle: {
-        backgroundColor: '#1f2937',
-      },
-      headerTintColor: '#10b981',
-      headerTitleStyle: {
-        fontWeight: 'bold',
-      },
-    }}
-  >
-    <Stack.Screen
-      name="Login"
-      component={LoginScreen}
-      options={{
-        headerShown: false,
-      }}
-    />
-    <Stack.Screen
-      name="Signup"
-      component={SignupScreen}
-      options={{
-        headerShown: false, // hide header for signup too
-      }}
-    />
-    <Stack.Screen
-      name="ConfirmationCode"
-      component={ConfirmationCode}
-      options={{
-        headerShown: false, // hide header for confirmation code screen
-      }}
-    />
-    <Stack.Screen
-      name="FeedScreen"
-      component={FeedScreen}
-      options={{ headerShown: false }}
-    />
-    <Stack.Screen
-      name="FriendsList"
-      component={FriendsList}
-      options={{ headerShown: false }}
-    />
-    <Stack.Screen
-      name="ChatScreen"
-      component={ChatScreen}
-      options={{ headerShown: false }}
-    />
-    <Stack.Screen
-      name="Profile"
-      component={Profile}
-      options={{ headerShown: false }}
-    />
-  </Stack.Navigator>
-);
+const AppNavigator = () => {
+  const { userToken, loadToken } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const init = async () => {
+      await loadToken();
+      setIsLoading(false);
+    };
+    init();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <View className="flex-1 items-center justify-center bg-black">
+        <ActivityIndicator size="large" color="#10b981" />
+      </View>
+    );
+  }
+
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!userToken ? (
+        <>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Signup" component={SignupScreen} />
+          <Stack.Screen name="ConfirmationCode" component={ConfirmationCode} />
+        </>
+      ) : (
+        <>
+          <Stack.Screen name="FeedScreen" component={FeedScreen} />
+          <Stack.Screen name="FriendsList" component={FriendsList} />
+          <Stack.Screen name="ChatScreen" component={ChatScreen} />
+          <Stack.Screen name="Profile" component={Profile} />
+          <Stack.Screen name="EditProfile" component={EditProfile} />
+          <Stack.Screen name="AppUsers" component={AppUsers} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="VideoCall" component={VideoCall} />
+        </>
+      )}
+    </Stack.Navigator>
+  );
+};
 
 export default AppNavigator;
