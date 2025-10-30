@@ -1,47 +1,47 @@
 import express from "express";
 import { Types } from "mongoose";
 import Chat, { IChat } from "../models/chat.model";
-import Message, { IMessage } from "../models/message.model";
+import Message from "../models/message.model";
 
 const messageRoutes = express.Router();
 
 messageRoutes.post("/", async (req, res) => {
-  try {
-    const { senderId, receiverId, text } = req.body;
+  console.log("📩 Incoming message payload:", req.body);
 
-    if (!senderId || !receiverId || !text) {
+  try {
+    const { sender, receiver, text } = req.body;
+
+    if (!sender || !receiver || !text) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const senderObjectId = new Types.ObjectId(senderId);
-    const receiverObjectId = new Types.ObjectId(receiverId);
+    const senderObjectId = new Types.ObjectId(sender);
+    const receiverObjectId = new Types.ObjectId(receiver);
 
-    // ✅ Explicitly type the query result
+    // Find or create chat
     let chat: IChat | null = await Chat.findOne({
       participants: { $all: [senderObjectId, receiverObjectId] },
     });
 
-    // ✅ If no chat, create one
     if (!chat) {
       chat = await Chat.create({
         participants: [senderObjectId, receiverObjectId],
       });
     }
 
-    // ✅ Create new message
-    const message: IMessage = await Message.create({
+    // ✅ Create message without manually overriding timestamps or defaults
+    const message = new Message({
       chat: chat._id,
       sender: senderObjectId,
+      receiver: receiverObjectId,
       text,
     });
 
-    // ✅ Now TypeScript knows chat is not null
-    chat.lastMessage = message._id as Types.ObjectId;
-    await chat.save();
-
+    await message.save();
+    console.log("✅ Message saved:", message);
     res.status(201).json(message);
   } catch (err) {
-    console.error(err);
+    console.error("Error sending message:", err);
     res.status(500).json({ error: "Failed to send message" });
   }
 });

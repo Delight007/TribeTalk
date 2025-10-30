@@ -22,12 +22,12 @@ router.post("/register", async (req: Request, res: Response) => {
   try {
     const { name, email, password } = req.body;
 
-    // 1️⃣ Validate fields
+    // 1️⃣ Validate input
     if (!name || !email || !password) {
       return res.status(400).json({ message: "All fields are required" });
     }
 
-    // 2️⃣ Check if user already exists
+    // 2️⃣ Check for existing user
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ message: "User already exists" });
@@ -39,7 +39,7 @@ router.post("/register", async (req: Request, res: Response) => {
     // 4️⃣ Generate verification code
     const verificationCode = Math.floor(1000 + Math.random() * 9000).toString();
 
-    // 5️⃣ Generate a unique username
+    // 5️⃣ Generate unique username
     const username = generateUsername(name);
 
     // 6️⃣ Create new user
@@ -49,12 +49,19 @@ router.post("/register", async (req: Request, res: Response) => {
       password: hashedPassword,
       verificationCode,
       isVerified: false,
-      username, // ✅ Now it is unique
+      username,
     });
 
     await newUser.save();
 
-    // 7️⃣ Send email
+    // 7️⃣ Respond immediately (don’t wait for email)
+    res.status(201).json({
+      message: "User registered successfully. Verification code sent to email.",
+      email,
+      name,
+    });
+
+    // 8️⃣ Fire-and-forget email sending (non-blocking)
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -63,21 +70,17 @@ router.post("/register", async (req: Request, res: Response) => {
       },
     });
 
-    await transporter.sendMail({
-      from: process.env.EMAIL_USER,
-      to: email,
-      subject: "Your Verification Code",
-      text: `Your verification code is ${verificationCode}`,
-    });
-
-    // 8️⃣ Respond
-    res.status(201).json({
-      message: "User registered successfully. Verification code sent to email.",
-      email,
-      username, // optional: return generated username
-    });
+    transporter
+      .sendMail({
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: "Your Verification Code",
+        text: `Your verification code is ${verificationCode}`,
+      })
+      .then(() => console.log(`✅ Verification email sent to ${email}`))
+      .catch((err) => console.error(`❌ Email send error:`, err));
   } catch (error) {
-    console.error(error);
+    console.error("Register error:", error);
     res.status(500).json({ message: "Server error", error });
   }
 });

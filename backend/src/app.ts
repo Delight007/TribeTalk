@@ -4,176 +4,181 @@ import express from "express";
 import http from "http";
 import mongoose from "mongoose";
 import { Server } from "socket.io";
+import chatModel from "./models/chat.model";
+import messageModel from "./models/message.model";
 import authRouter from "./routes/authroutes";
 import chatRouter from "./routes/chatRoutes";
 import friendsRouter from "./routes/friends";
 import messageRouter from "./routes/messageRoute";
 import userRouter from "./routes/userRoutes";
 import { generateAgoraToken } from "./utils/agoraToken";
+import chatMessage from "./routes/messages";
 
 dotenv.config();
-console.log("AGORA_APP_ID:", process.env.AGORA_APP_ID);
-console.log("AGORA_APP_CERTIFICATE:", process.env.AGORA_APP_CERTIFICATE);
 
 const app = express();
 const server = http.createServer(app);
 
-// --- Socket.IO Setup ---
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
+  transports: ["websocket"],
 });
 
-// --- Middleware ---
-app.use(express.json());
+// Middleware
 app.use(cors());
+app.use(express.json());
 
 // --- API Routes ---
 app.use("/api/auth", authRouter);
 app.use("/api/users", userRouter);
 app.use("/api/chats", chatRouter);
 app.use("/api/messages", messageRouter);
+app.use("/api/chatMessages", chatMessage);
 app.use("/api/friends", friendsRouter);
 
-// --- MongoDB Connection ---
+// MongoDB Connection
 mongoose
   .connect(process.env.MONGO_URI as string, { dbName: "chatapp" })
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// --- Track Online Users ---
+// --- Socket.IO Online Users Tracking ---
 interface OnlineUsers {
-  [userId: string]: string; // userId -> socketId
+  [userId: string]: string[]; // userId -> array of socketIds (supports multiple devices)
 }
 const onlineUsers: OnlineUsers = {};
 
-// --- Socket.IO Core Logic ---
+// --- Socket.IO Events ---
 io.on("connection", (socket) => {
-  console.log("🟢 User connected:", socket.id);
+  console.log(`🟢 New connection: ${socket.id}`);
 
-  // 1️⃣ Register user
+  // Register user
   socket.on("register", (userId: string) => {
-    onlineUsers[userId] = socket.id;
-    console.log(`✅ Registered user: ${userId} → ${socket.id}`);
+    if (!onlineUsers[userId]) onlineUsers[userId] = [];
+    onlineUsers[userId].push(socket.id);
+    console.log(`✅ Registered user: ${userId} → ${onlineUsers[userId]}`);
   });
 
-  // 2️⃣ Join a chat room
+  // Join chat room
   socket.on("joinRoom", (roomId: string) => {
     socket.join(roomId);
-    console.log(`👥 User ${socket.id} joined room ${roomId}`);
+    console.log(`👥 ${socket.id} joined room ${roomId}`);
   });
 
-  // 3️⃣ Handle chat messages
-  socket.on("sendMessage", ({ roomId, message }) => {
-    io.to(roomId).emit("receiveMessage", {
-      ...message,
-      time: new Date().toISOString(),
-    });
+  // Leave chat room
+  socket.on("leaveRoom", (roomId: string) => {
+    socket.leave(roomId);
+    console.log(`👋 ${socket.id} left room ${roomId}`);
   });
 
-  // ==============================================================
-  // 🟩 VIDEO CALL SYSTEM (FULL FLOW)
-  // ==============================================================
-
-  // --- Caller starts a video call ---
-  socket.on(
-    "startVideoCall",
-    async ({
-      roomId,
-      from,
-      fromName,
-      to,
-    }: {
-      roomId: string;
-      from: string;
-      fromName: string;
-      to: string;
-    }) => {
-      console.log(
-        `📞 ${fromName} (${from}) is calling ${to} in room ${roomId}`
-      );
-
-      const targetSocket = onlineUsers[to];
-      if (!targetSocket) {
-        console.log("❌ Receiver not online");
-        socket.emit("callUnavailable", { message: "User not available" });
-        return;
+  // Send message
+  socket.on("sendMessage", async ({ roomId, message }) => {
+    try {
+      if (!message) {
+        console.error("❌ Received undefined message payload");
+        return socket.emit("messageError", { error: "Invalid message format" });
       }
 
-      // Generate Agora token for receiver
-      const token = generateAgoraToken(roomId, to);
+      const { sender, receiver, text } = message;
+      if (!sender || !receiver || !text) {
+        console.error("❌ Missing message fields:", message);
+        return socket.emit("messageError", { error: "Missing message fields" });
+      }
 
-      // Notify receiver
-      io.to(targetSocket).emit("incomingCall", {
+      // 🔹 Find or create chat
+      let chat = await chatModel.findOne({
+        participants: { $all: [sender, receiver] },
+      });
+
+      if (!chat) {
+        chat = await chatModel.create({
+          participants: [sender, receiver],
+        });
+        console.log("🆕 Created new chat:", chat._id);
+      }
+
+      // 🔹 Save message to DB
+      const newMessage = new messageModel({
+        chat: chat._id,
+        sender: sender,
+        receiver: receiver,
+        text,
+      });
+      console.log(newMessage);
+
+      const savedMessage = await newMessage.save();
+
+      const msgWithTime = {
+        ...savedMessage.toObject(),
+        time: savedMessage.createdAt,
+        roomId,
+      };
+
+      // 🔸 Emit to users
+      io.to(roomId).emit("receiveMessage", msgWithTime);
+
+      const recipientSockets = onlineUsers[receiver] || [];
+      recipientSockets.forEach((sockId) =>
+        io.to(sockId).emit("receiveMessage", msgWithTime)
+      );
+
+      console.log("💾 Message saved and broadcasted:", savedMessage._id);
+    } catch (error) {
+      console.error("❌ Error saving message:", error);
+      socket.emit("messageError", { error: "Failed to send message" });
+    }
+  });
+
+  // Video call events
+  socket.on("startVideoCall", ({ roomId, from, fromName, to }) => {
+    const targetSockets = onlineUsers[to] || [];
+    if (targetSockets.length === 0) {
+      socket.emit("callUnavailable", { message: "User not online" });
+      return;
+    }
+    const token = generateAgoraToken(roomId, to);
+    targetSockets.forEach((sockId) => {
+      io.to(sockId).emit("incomingCall", {
         from: fromName,
         fromId: from,
         channel: roomId,
         token,
       });
-    }
-  );
-
-  // --- Receiver accepts the call ---
-  socket.on(
-    "acceptCall",
-    ({ to, channel, uid }: { to: string; channel: string; uid: string }) => {
-      console.log(`✅ ${uid} accepted call from ${to}`);
-      const token = generateAgoraToken(channel, uid);
-      const targetSocket = onlineUsers[to];
-      if (targetSocket) {
-        io.to(targetSocket).emit("callAccepted", { channel, token });
-      }
-    }
-  );
-
-  // --- Receiver declines the call ---
-  socket.on("rejectCall", ({ to }: { to: string }) => {
-    console.log("❌ Call rejected");
-    const targetSocket = onlineUsers[to];
-    if (targetSocket) {
-      io.to(targetSocket).emit("callRejected");
-    }
+    });
   });
 
-  // --- Either user ends the call ---
-  socket.on("endCall", ({ to }: { to: string }) => {
-    console.log("📴 Call ended");
-    const targetSocket = onlineUsers[to];
-    if (targetSocket) {
-      io.to(targetSocket).emit("callEnded");
-    }
-  });
-
-  // --- Disconnect handler ---
-  socket.on("disconnect", () => {
-    for (const userId in onlineUsers) {
-      if (onlineUsers[userId] === socket.id) {
-        delete onlineUsers[userId];
-        console.log(`🔴 User ${userId} disconnected`);
-        break;
-      }
-    }
-  });
-});
-
-// ================================================================
-// 🧩 API Route: Generate Agora Token
-// ================================================================
-app.get("/api/agora/token/:channel", (req, res) => {
-  const { channel } = req.params;
-  const uid = Math.floor(Math.random() * 10000).toString();
-  try {
+  socket.on("acceptCall", ({ to, channel, uid }) => {
     const token = generateAgoraToken(channel, uid);
-    return res.json({ token });
-  } catch (error) {
-    console.error("Error generating token:", error);
-    return res.status(500).json({ error: "Failed to generate token" });
-  }
+    const targetSockets = onlineUsers[to] || [];
+    targetSockets.forEach((sockId) =>
+      io.to(sockId).emit("callAccepted", { channel, token })
+    );
+  });
+
+  socket.on("rejectCall", ({ to }) => {
+    const targetSockets = onlineUsers[to] || [];
+    targetSockets.forEach((sockId) => io.to(sockId).emit("callRejected"));
+  });
+
+  socket.on("endCall", ({ to }) => {
+    const targetSockets = onlineUsers[to] || [];
+    targetSockets.forEach((sockId) => io.to(sockId).emit("callEnded"));
+  });
+
+  // Disconnect
+  socket.on("disconnect", () => {
+    console.log(`🔴 Socket disconnected: ${socket.id}`);
+    for (const userId in onlineUsers) {
+      onlineUsers[userId] = onlineUsers[userId].filter(
+        (id) => id !== socket.id
+      );
+      if (onlineUsers[userId].length === 0) delete onlineUsers[userId];
+    }
+  });
 });
 
-// ================================================================
-// 🚀 Start the Server
-// ================================================================
-const PORT = Number(process.env.PORT) || 5000;
-server.listen(PORT, "0.0.0.0", () =>
-  console.log(`🚀 Server running on port ${PORT}`)
-);
+// Start server
+const PORT = process.env.PORT || 5000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
