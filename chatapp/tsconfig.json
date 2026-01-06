@@ -1,0 +1,10 @@
+{
+  "extends": "@react-native/typescript-config",
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "nativewind-env.d.ts"
+    // "react-native-linear-gradient.d.ts"
+  ],
+  "exclude": ["**/node_modules", "**/Pods"]
+}
