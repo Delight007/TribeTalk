@@ -8,6 +8,8 @@
 <string>We need access to your photos</string>
 <key>NSCameraUsageDescription</key>
 <string>We need camera access</string>
+<key>NSMicrophoneUsageDescription</key>
+<string>We need access to record voice messages</string>
 
 
 	<key>CFBundleDevelopmentRegion</key>

@@ -26,7 +26,7 @@ export async function initSocket(userId: string): Promise<Socket | null> {
     return null;
   }
 
-  socket = io('http://10.177.54.72:3000', {
+  socket = io('http://10.142.203.72:3000', {
     transports: ['websocket'],
     auth: { token, userId },
     reconnection: true,

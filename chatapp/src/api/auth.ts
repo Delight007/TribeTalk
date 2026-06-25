@@ -146,42 +146,63 @@ export const useUnfollowUser = () => {
 // };
 
 // 🟦 Get all messages for a chat
-export const useChatMessages = (chatId?: string) => {
+export const useChatMessages = (chatId?: string, limit: number = 50, offset: number = 0) => {
   return useQuery({
-    queryKey: ['messages', chatId],
+    queryKey: ['messages', chatId, limit, offset],
     queryFn: async () => {
-      const { data } = await api.get(`/chatMessages/${chatId}`);
+      const { data } = await api.get(`/chatMessages/${chatId}?limit=${limit}&offset=${offset}`);
       return data;
     },
     enabled: !!chatId,
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 };
 
-// 🟨 Send a new message
+type SendMessagePayload = {
+  sender: string;
+  receiver: string;
+  type: 'text' | 'image' | 'video' | 'document' | 'voice';
+  text?: string; // for text
+  mediaUrl?: string; // for all media types
+  fileName?: string; // for document
+  fileSize?: number; // for document
+  duration?: number; // for voice
+};
+
+
 export const useSendMessage = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: {
-      sender: string;
-      receiver: string;
-      text: string;
-    }) => {
-      const { sender, receiver, text } = payload; // destructure correctly
+    mutationFn: async (payload: SendMessagePayload) => {
+      const {
+        sender,
+        receiver,
+        type,
+        text,
+        mediaUrl,
+        fileName,
+        fileSize,
+        duration,
+      } = payload;
 
       const { data } = await api.post('/messages', {
-        sender, // match backend field names
+        sender,
         receiver,
+        type,
         text,
+        mediaUrl,
+        fileName,
+        fileSize,
+        duration,
       });
 
       return data;
     },
     onSuccess: newMessage => {
       queryClient.invalidateQueries({
-        queryKey: ['messages', newMessage.chat], // invalidate the chat messages query
+        queryKey: ['messages', newMessage.chat],
       });
     },
   });

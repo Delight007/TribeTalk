@@ -52,6 +52,8 @@ react {
 
     /* Autolinking */
     autolinkLibrariesWithApp()
+    //
+   
 }
 
 /**
@@ -75,7 +77,8 @@ def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
-    compileSdk rootProject.ext.compileSdkVersion
+    // Use assignment form for compileSdk to be compatible with newer Android Gradle Plugin
+    compileSdk = rootProject.ext.compileSdkVersion
 
     namespace "com.chatapp"
     defaultConfig {

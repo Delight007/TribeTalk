@@ -1,94 +1,91 @@
+// // chatStore.ts
+
 // chatStore.ts
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist, StateStorage } from 'zustand/middleware';
 import { getSocket } from '../contexts/socketIo';
 
-// Custom storage that uses user-specific keys
-const createUserSpecificStorage = (): StateStorage => {
-  return {
-    getItem: async (name: string): Promise<string | null> => {
-      try {
-        // First, try to get the current userId from a separate key
-        let userId = await AsyncStorage.getItem('chat-current-user-id');
-
-        // If not found, try to get it from the token (decode JWT or get from user store)
-        // For now, we'll rely on setCurrentUser being called after login
-        // If userId is not set yet, return null (no data to load)
-        if (!userId) {
-          return null;
-        }
-
-        // Use user-specific storage key
+// ------------------ Custom storage per user ------------------
+const createUserSpecificStorage = (): StateStorage => ({
+  getItem: async (name: string) => {
+    try {
+      const userId = await AsyncStorage.getItem('chat-current-user-id');
+      if (!userId) return null;
+      const userStorageKey = `chat-storage-${userId}`;
+      return await AsyncStorage.getItem(userStorageKey);
+    } catch (err) {
+      console.warn('Error getting chat storage:', err);
+      return null;
+    }
+  },
+  setItem: async (name: string, value: string) => {
+    try {
+      const userId = await AsyncStorage.getItem('chat-current-user-id');
+      if (!userId) return;
+      const userStorageKey = `chat-storage-${userId}`;
+      await AsyncStorage.setItem(userStorageKey, value);
+    } catch (err) {
+      console.warn('Error setting chat storage:', err);
+    }
+  },
+  removeItem: async (name: string) => {
+    try {
+      const userId = await AsyncStorage.getItem('chat-current-user-id');
+      if (userId) {
         const userStorageKey = `chat-storage-${userId}`;
-        const value = await AsyncStorage.getItem(userStorageKey);
-        return value;
-      } catch (error) {
-        console.warn('Error getting chat storage:', error);
-        return null;
+        await AsyncStorage.removeItem(userStorageKey);
       }
-    },
-    setItem: async (name: string, value: string): Promise<void> => {
-      try {
-        // Get the current userId from AsyncStorage
-        let userId = await AsyncStorage.getItem('chat-current-user-id');
+      await AsyncStorage.removeItem(name).catch(() => {});
+    } catch (err) {
+      console.warn('Error removing chat storage:', err);
+    }
+  },
+});
 
-        // If not found in AsyncStorage, try to get it from the store state
-        // This handles the race condition where setCurrentUser hasn't finished writing to AsyncStorage yet
-        if (!userId) {
-          const storeState = useChatStore.getState();
-          userId = storeState.currentUserId || null;
-        }
-
-        if (!userId) {
-          // Silently skip saving if no userId - this is expected during logout or before login
-          return;
-        }
-
-        // Use user-specific storage key
-        const userStorageKey = `chat-storage-${userId}`;
-        await AsyncStorage.setItem(userStorageKey, value);
-      } catch (error) {
-        console.warn('Error setting chat storage:', error);
-      }
-    },
-    removeItem: async (name: string): Promise<void> => {
-      try {
-        // Get the current userId
-        const userId = await AsyncStorage.getItem('chat-current-user-id');
-        if (userId) {
-          // Remove user-specific storage
-          const userStorageKey = `chat-storage-${userId}`;
-          await AsyncStorage.removeItem(userStorageKey);
-        }
-        // Also try to remove the generic key (for backward compatibility)
-        await AsyncStorage.removeItem(name).catch(() => {});
-      } catch (error) {
-        console.warn('Error removing chat storage:', error);
-      }
-    },
-  };
+// ------------------ Helpers ------------------
+const getLastMessagePreview = (msg: Message) => {
+  switch (msg.type) {
+    case 'image':
+      return '📷 Photo';
+    case 'video':
+      return '🎥 Video';
+    case 'document':
+      return '📄 Document';
+    case 'voice':
+      return '🎤 Voice message';
+    default:
+      return msg.text ?? '';
+  }
 };
 
-// --- Types ---
-
+// ------------------ Types ------------------
 export interface Message {
   _id: string;
   chatId: string;
-  sender: string;
-  receiver: string;
-  text: string;
+
+  type: 'text' | 'image' | 'video' | 'document' | 'voice';
+  text?: string;
+  mediaUrl?: string;
+  fileName?: string;
+  fileSize?: number;
+  mimeType?: string;
+  duration?: number;
+  waveform?: number[]; // local UI-only amplitude bars for voice notes
   createdAt: string;
+  localUri?: string; // new: local cache path for voice
   deliveredAt?: string | null;
   readAt?: string | null;
   status?: 'pending' | 'sent' | 'delivered';
+  userId: string; // <--- ID of the sender
 }
 
 export interface FriendInfo {
   _id: string;
   name: string;
   avatar?: string;
-  // add other fields you need (username, email, etc.)
+  username?: string;
+  email?: string;
 }
 
 export interface ChatSummary {
@@ -102,26 +99,18 @@ export interface ChatSummary {
 interface ChatState {
   currentUserId?: string;
   currentRoomId?: string;
-
-  // full messages per room
   messages: Record<string, Message[]>;
-
-  // chat‑list summaries / metadata
   summaries: Record<string, ChatSummary>;
-
-  // pending messages (when offline / not sent yet)
   pendingMessages: Record<string, Message[]>;
+  // currentlyPlayingVoiceNote: string | null; // messageId of currently playing voice note
 
-  // --- actions ---
+  // Actions
   setCurrentUser: (id: string | undefined) => void;
   joinRoom: (roomId: string) => void;
   leaveRoom: () => void;
-
-  // sendMessage: (msg: Omit<Message, 'createdAt' | 'status'>) => void;
   sendMessage: (
     msg: Omit<Message, '_id' | 'chatId' | 'createdAt' | 'status'>,
   ) => void;
-
   addMessage: (msg: Message, friend?: FriendInfo) => void;
   addMessages: (roomId: string, msgs: Message[], prepend?: boolean) => void;
   replaceLocalMessage: (
@@ -129,30 +118,27 @@ interface ChatState {
     tempId: string,
     serverMsg: Message,
   ) => void;
-
   markMessageDelivered: (
     roomId: string,
     messageId?: string,
     tempId?: string,
     deliveredAt?: string | null,
   ) => void;
-
   markMessagesRead: (
     roomId: string,
     messageIds: string[],
     readAt?: string | null,
   ) => void;
-
+  updateLocalUri: (roomId: string, messageId: string, localUri: string) => void;
   retryPendingMessages: () => void;
   loadOlderMessages: (roomId: string, olderMsgs: Message[]) => void;
-
-  // --- summary actions ---
   updateSummary: (chatId: string, summary: Omit<ChatSummary, 'chatId'>) => void;
   markChatRead: (chatId: string) => void;
   clearSummaries: () => void;
   clearAllChatData: () => void;
 }
 
+// ------------------ Store ------------------
 export const useChatStore = create<ChatState>()(
   persist(
     (set, get) => ({
@@ -161,49 +147,24 @@ export const useChatStore = create<ChatState>()(
       messages: {},
       summaries: {},
       pendingMessages: {},
+      // currentlyPlayingVoiceNote: null,
 
-      // 1. register user & setup socket listeners
-      setCurrentUser: async (id: string | undefined) => {
-        const currentUserId = get().currentUserId;
-
-        // If id is undefined, clear everything (logout)
+      // ------------------ Set current user ------------------
+      setCurrentUser: async id => {
         if (!id) {
-          console.log('Clearing currentUserId (logout)');
           set({
-            summaries: {},
-            messages: {},
-            pendingMessages: {},
-            currentRoomId: undefined,
             currentUserId: undefined,
+            currentRoomId: undefined,
+            messages: {},
+            summaries: {},
+            pendingMessages: {},
           });
-          await AsyncStorage.removeItem('chat-current-user-id').catch(() => {});
+          await AsyncStorage.removeItem('chat-current-user-id');
           return;
         }
 
-        // Update the stored userId FIRST before clearing state
-        // This ensures the storage adapter uses the correct key
-        // Await this to ensure it's set before we trigger state updates that might persist
-        await AsyncStorage.setItem('chat-current-user-id', id).catch(err =>
-          console.warn('Error setting chat user id:', err),
-        );
-
-        // If user is changing, clear in-memory state
-        if (currentUserId && currentUserId !== id) {
-          console.log(
-            `User changing from ${currentUserId} to ${id}, clearing chat data`,
-          );
-          // Clear in-memory state immediately
-          set({
-            summaries: {},
-            messages: {},
-            pendingMessages: {},
-            currentRoomId: undefined,
-            currentUserId: id, // Set new userId
-          });
-        } else {
-          // Same user or first time - just update userId
-          set({ currentUserId: id });
-        }
+        await AsyncStorage.setItem('chat-current-user-id', id);
+        set({ currentUserId: id });
 
         const socket = getSocket();
         if (!socket) return;
@@ -214,97 +175,87 @@ export const useChatStore = create<ChatState>()(
         socket.off('receiveMessage');
         socket.off('messageDelivered');
         socket.off('messagesRead');
+        socket.off('connect');
 
-        socket.on('receiveMessage', payload => {
+        // Retry pending messages when socket reconnects
+        socket.on('connect', () => {
+          console.log('🔄 Socket reconnected, retrying pending messages');
+          get().retryPendingMessages();
+        });
+
+        socket.on('receiveMessage', (payload: any) => {
           try {
             const roomId = payload.roomId || payload.chatId || payload.chat;
-            if (!roomId) {
-              console.warn('receiveMessage: missing chatId/roomId', payload);
-              return;
-            }
+            if (!roomId) return;
 
             const msg: Message = {
               _id: String(payload._id),
               chatId: roomId,
-              sender: payload.sender,
-              receiver: payload.receiver,
+              type: payload.type ?? 'text',
               text: payload.text,
+              mediaUrl: payload.mediaUrl,
+              fileName: payload.fileName,
+              fileSize: payload.fileSize,
+              mimeType: payload.mimeType,
+              duration: payload.duration,
               createdAt: payload.createdAt,
               deliveredAt: payload.deliveredAt ?? null,
               readAt: payload.readAt ?? null,
               status: payload.delivered ? 'delivered' : 'sent',
+              userId: payload.userId, // <-- Add this line
             };
 
-            // Add message to history
             get().addMessage(msg, payload.friend);
 
-            // Update summary for chat‑list
-            const friend = payload.friend as FriendInfo;
+            const friend: FriendInfo = payload.friend;
             const old = get().summaries[roomId];
-            const newUnread = old && old.unreadCount ? old.unreadCount + 1 : 1;
+            const unread = old && old.unreadCount ? old.unreadCount + 1 : 1;
 
             get().updateSummary(roomId, {
               friend,
-              lastMessage: msg.text,
+              lastMessage: getLastMessagePreview(msg),
               lastMessageAt: msg.createdAt,
-              unreadCount: newUnread,
+              unreadCount: unread,
             });
           } catch (err) {
-            console.warn('⚠️ receiveMessage handler error:', err);
+            console.warn('receiveMessage handler error:', err);
           }
         });
 
-        socket.on('messageDelivered', info => {
-          try {
-            const roomId = info.chat || get().currentRoomId;
-            if (!roomId) return;
-            get().markMessageDelivered(
-              roomId,
-              info.messageId,
-              info.tempId,
-              info.deliveredAt,
-            );
-          } catch (err) {
-            console.warn('⚠️ messageDelivered handler error:', err);
-          }
+        socket.on('messageDelivered', (info: any) => {
+          const roomId = info.chat || get().currentRoomId;
+          if (!roomId) return;
+          get().markMessageDelivered(
+            roomId,
+            info.messageId,
+            info.tempId,
+            info.deliveredAt,
+          );
         });
 
-        socket.on('messagesRead', info => {
-          try {
-            const { chatId, messageIds } = info;
-            if (!chatId || !messageIds) return;
-            get().markMessagesRead(chatId, messageIds, info.readAt);
-
-            // Optionally, mark chat summary unreadCount = 0
-            get().markChatRead(chatId);
-          } catch (err) {
-            console.warn('⚠️ messagesRead handler error:', err);
-          }
+        socket.on('messagesRead', (info: any) => {
+          if (!info.chatId || !info.messageIds) return;
+          get().markMessagesRead(info.chatId, info.messageIds, info.readAt);
+          get().markChatRead(info.chatId);
         });
       },
 
-      // 2. room management
+      // ------------------ Join / Leave rooms ------------------
       joinRoom: roomId => {
         const socket = getSocket();
         if (!socket) return;
 
         const prev = get().currentRoomId;
-        const doJoin = () => {
-          if (prev && prev !== roomId) {
-            socket.emit('leaveRoom', prev);
-          }
-          socket.emit('joinRoom', roomId);
-          set({ currentRoomId: roomId });
-          set(state => ({
-            messages: {
-              ...state.messages,
-              [roomId]: state.messages[roomId] || [],
-            },
-          }));
-        };
+        if (prev && prev !== roomId) socket.emit('leaveRoom', prev);
 
-        if (socket.connected) doJoin();
-        else socket.once('connect', doJoin);
+        socket.emit('joinRoom', roomId);
+        set({ currentRoomId: roomId });
+        set(state => ({
+          messages: {
+            ...state.messages,
+            [roomId]: state.messages[roomId] || [],
+          },
+        }));
       },
 
       leaveRoom: () => {
@@ -313,79 +264,84 @@ export const useChatStore = create<ChatState>()(
         const roomId = get().currentRoomId;
         if (!roomId) return;
 
-        const doLeave = () => {
-          socket.emit('leaveRoom', roomId);
-          set({ currentRoomId: undefined });
-        };
-
-        if (socket.connected) doLeave();
-        else socket.once('connect', doLeave);
+        socket.emit('leaveRoom', roomId);
+        set({ currentRoomId: undefined });
       },
 
-      // 3. sending messages
+      // ------------------ Send message ------------------
       sendMessage: msg => {
         const socket = getSocket();
         const roomId = get().currentRoomId;
+        const currentUserId = get().currentUserId;
+
         if (!roomId) return;
 
+        // Create a temporary local message for optimistic UI
         const tempId = `local-${Date.now()}`;
         const placeholder: Message = {
           _id: tempId,
           chatId: roomId,
-          sender: msg.sender,
-          receiver: msg.receiver,
+          type: msg.type,
           text: msg.text,
+          mediaUrl: msg.mediaUrl,
+          fileName: msg.fileName,
+          fileSize: msg.fileSize,
+          mimeType: msg.mimeType,
+          duration: msg.duration,
+          localUri: msg.localUri,
+          waveform: msg.waveform,
           createdAt: new Date().toISOString(),
           status: socket?.connected ? 'sent' : 'pending',
+          userId: currentUserId!,
         };
 
+        // Add the placeholder locally
         get().addMessage(placeholder);
 
-        if (socket?.connected) {
-          socket.emit(
-            'sendMessage',
-            { roomId, message: placeholder, tempId },
-            (serverMsg: any) => {
-              const resolved: Message = {
-                ...serverMsg,
-                chatId: roomId,
-                status: 'sent',
-              };
-              get().replaceLocalMessage(roomId, tempId, resolved);
-
-              // Also update summary, because this user sent a message
-              const friend: FriendInfo = serverMsg.friend!; // ensure backend returns friend info too
-              get().updateSummary(roomId, {
-                friend,
-                lastMessage: resolved.text,
-                lastMessageAt: resolved.createdAt,
-                unreadCount: 0, // since it's sent by current user
-              });
-            },
-          );
-        } else {
+        if (!socket?.connected) {
+          // Store pending message if offline
           set(state => ({
             pendingMessages: {
               ...state.pendingMessages,
               [roomId]: [...(state.pendingMessages[roomId] || []), placeholder],
             },
           }));
+          return;
         }
+
+        // Send to server
+        socket.emit(
+          'sendMessage',
+          { roomId, message: placeholder, tempId },
+          (serverMsg: any) => {
+            // Server replaces local message
+            const resolved: Message = {
+              ...serverMsg,
+              chatId: roomId,
+              status: 'sent',
+            };
+            get().replaceLocalMessage(roomId, tempId, resolved);
+
+            // Update chat summary
+            const friend: FriendInfo = serverMsg.friend!;
+            get().updateSummary(roomId, {
+              friend,
+              lastMessage: getLastMessagePreview(resolved),
+              lastMessageAt: resolved.createdAt,
+              unreadCount: 0,
+            });
+          },
+        );
       },
 
-      // 4. message / messages management
+      // ------------------ Message management ------------------
       addMessage: (msg, friend) => {
         const roomId = msg.chatId;
         set(state => {
           const existing = state.messages[roomId] || [];
-          if (existing.some(m => m._id === msg._id)) {
-            return state;
-          }
+          if (existing.some(m => m._id === msg._id)) return state;
           return {
-            messages: {
-              ...state.messages,
-              [roomId]: [...existing, msg],
-            },
+            messages: { ...state.messages, [roomId]: [...existing, msg] },
           };
         });
       },
@@ -395,7 +351,7 @@ export const useChatStore = create<ChatState>()(
           const existing = state.messages[roomId] || [];
           const ids = new Set(existing.map(m => m._id));
           const newOnes = msgs.filter(m => m._id && !ids.has(m._id));
-          if (newOnes.length === 0) return state;
+          if (!newOnes.length) return state;
           return {
             messages: {
               ...state.messages,
@@ -411,23 +367,21 @@ export const useChatStore = create<ChatState>()(
         set(state => {
           const existing = state.messages[roomId] || [];
           const idx = existing.findIndex(m => m._id === tempId);
-          if (idx === -1) {
-            if (existing.some(m => m._id === serverMsg._id)) return state;
+          if (idx === -1)
             return {
               messages: {
                 ...state.messages,
                 [roomId]: [...existing, serverMsg],
               },
             };
-          }
+          const old = existing[idx];
           const updated = [...existing];
-          updated[idx] = serverMsg;
-          return {
-            messages: {
-              ...state.messages,
-              [roomId]: updated,
-            },
+          updated[idx] = {
+            ...serverMsg,
+            localUri: old.localUri ?? serverMsg.localUri,
+            waveform: old.waveform ?? serverMsg.waveform,
           };
+          return { messages: { ...state.messages, [roomId]: updated } };
         });
       },
 
@@ -440,17 +394,13 @@ export const useChatStore = create<ChatState>()(
               (!messageId && tempId && m._id === tempId),
           );
           if (idx === -1) return state;
-          const msg = { ...existing[idx] };
-          msg.deliveredAt = deliveredAt ?? new Date().toISOString();
-          msg.status = 'delivered';
           const updated = [...existing];
-          updated[idx] = msg;
-          return {
-            messages: {
-              ...state.messages,
-              [roomId]: updated,
-            },
+          updated[idx] = {
+            ...existing[idx],
+            deliveredAt: deliveredAt ?? new Date().toISOString(),
+            status: 'delivered' as const,
           };
+          return { messages: { ...state.messages, [roomId]: updated } };
         });
       },
 
@@ -459,48 +409,54 @@ export const useChatStore = create<ChatState>()(
           const existing = state.messages[roomId] || [];
           const idSet = new Set(ids);
           const updated = existing.map(m =>
-            m._id && idSet.has(m._id)
+            idSet.has(m._id)
               ? { ...m, readAt: readAt ?? new Date().toISOString() }
               : m,
           );
+          return { messages: { ...state.messages, [roomId]: updated } };
+        });
+      },
+
+      updateLocalUri: (roomId, messageId, localUri) => {
+        set(state => {
+          const messages = state.messages[roomId] || [];
+
           return {
             messages: {
               ...state.messages,
-              [roomId]: updated,
+              [roomId]: messages.map(msg =>
+                msg._id === messageId
+                  ? {
+                      ...msg,
+                      localUri,
+                    }
+                  : msg,
+              ),
             },
           };
         });
       },
 
-      loadOlderMessages: (roomId, olderMsgs) => {
-        get().addMessages(roomId, olderMsgs, true);
-      },
+      loadOlderMessages: (roomId, olderMsgs) =>
+        get().addMessages(roomId, olderMsgs, true),
 
       retryPendingMessages: () => {
         const roomId = get().currentRoomId;
         if (!roomId) return;
         const pending = get().pendingMessages[roomId] || [];
-        if (pending.length === 0) return;
+        if (!pending.length) return;
         const socket = getSocket();
         if (!socket?.connected) return;
 
-        pending.forEach(msg => {
-          socket.emit('sendMessage', {
-            roomId,
-            message: msg,
-            tempId: msg._id,
-          });
-        });
-
+        pending.forEach(msg =>
+          socket.emit('sendMessage', { roomId, message: msg, tempId: msg._id }),
+        );
         set(state => ({
-          pendingMessages: {
-            ...state.pendingMessages,
-            [roomId]: [],
-          },
+          pendingMessages: { ...state.pendingMessages, [roomId]: [] },
         }));
       },
 
-      // 5. summary actions
+      // ------------------ Chat summaries ------------------
       updateSummary: (chatId, summaryData) => {
         set(state => {
           const existing = state.summaries[chatId];
@@ -509,7 +465,7 @@ export const useChatStore = create<ChatState>()(
               ...state.summaries,
               [chatId]: {
                 chatId,
-                friend: summaryData.friend ?? existing?.friend,
+                friend: summaryData.friend ?? existing?.friend!,
                 lastMessage:
                   summaryData.lastMessage ?? existing?.lastMessage ?? '',
                 lastMessageAt:
@@ -524,30 +480,21 @@ export const useChatStore = create<ChatState>()(
         });
       },
 
-      markChatRead: (chatId: string) => {
+      markChatRead: chatId => {
         set(state => {
           const existing = state.summaries[chatId];
           if (!existing) return {};
           return {
             summaries: {
               ...state.summaries,
-              [chatId]: {
-                ...existing,
-                unreadCount: 0,
-              },
+              [chatId]: { ...existing, unreadCount: 0 },
             },
           };
         });
       },
 
-      clearSummaries: () => {
-        set({ summaries: {} });
-      },
-
+      clearSummaries: () => set({ summaries: {} }),
       clearAllChatData: () => {
-        // Clear in-memory state only
-        // Storage is user-specific, so we don't need to clear it
-        // When user changes, the new user's storage will be loaded automatically
         set({
           summaries: {},
           messages: {},
@@ -557,74 +504,33 @@ export const useChatStore = create<ChatState>()(
       },
     }),
     {
-      name: 'chat-storage', // This is just a name, actual key is user-specific
+      name: 'chat-storage',
       storage: createJSONStorage(createUserSpecificStorage),
-      // Only persist certain fields - DO NOT persist summaries
-      // Summaries should always be loaded fresh from the API for each user
       partialize: state => ({
         currentUserId: state.currentUserId,
         currentRoomId: state.currentRoomId,
-        // Persist messages and pendingMessages for offline support
         messages: state.messages,
         pendingMessages: state.pendingMessages,
-        // DO NOT persist summaries - they will be loaded from API
       }),
-      // Validate on rehydration
       onRehydrateStorage: () => async (state, error) => {
-        if (error) {
-          console.warn('Error rehydrating chat store:', error);
-          return;
-        }
-
-        // Get the expected userId from AsyncStorage
+        if (error) console.warn('Error rehydrating chat store:', error);
         const expectedUserId = await AsyncStorage.getItem(
           'chat-current-user-id',
         ).catch(() => null);
-
-        // If rehydrated state has a userId
-        if (state?.currentUserId) {
-          // Check if the rehydrated userId matches the expected userId
-          if (expectedUserId && state.currentUserId !== expectedUserId) {
-            // User mismatch - clear the rehydrated data and set correct userId
-            console.log(
-              `User mismatch detected: rehydrated=${state.currentUserId}, expected=${expectedUserId}, clearing data`,
-            );
-            // Clear all data and set the correct userId without triggering socket setup
-            useChatStore.setState({
-              summaries: {}, // Always clear summaries on user mismatch
-              messages: {},
-              pendingMessages: {},
-              currentRoomId: undefined,
-              currentUserId: expectedUserId,
-            });
-            return;
-          }
-
-          // User matches - ensure it's stored for storage key lookup
-          await AsyncStorage.setItem(
-            'chat-current-user-id',
-            state.currentUserId,
-          ).catch(() => {});
-        } else {
-          // If no userId in state, try to get it from storage
-          if (expectedUserId) {
-            // Set the userId in state if it exists in storage but not in state
-            // Use setState to avoid triggering socket setup during rehydration
-            useChatStore.setState({
-              currentUserId: expectedUserId,
-              summaries: {}, // Ensure summaries are empty on initial load
-            });
-          }
+        if (
+          state?.currentUserId &&
+          expectedUserId &&
+          state.currentUserId !== expectedUserId
+        ) {
+          useChatStore.setState({
+            summaries: {},
+            messages: {},
+            pendingMessages: {},
+            currentRoomId: undefined,
+            currentUserId: expectedUserId,
+          });
         }
-
-        // Always ensure summaries are empty after rehydration
-        // They will be loaded fresh from the API
-        if (state?.summaries && Object.keys(state.summaries).length > 0) {
-          console.log(
-            'Clearing persisted summaries after rehydration - will load fresh from API',
-          );
-          useChatStore.setState({ summaries: {} });
-        }
+        useChatStore.setState({ summaries: {} });
       },
     },
   ),

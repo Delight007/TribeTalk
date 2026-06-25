@@ -15,7 +15,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCurrentUser, useUpdateProfile } from '../../../api/auth';
 import { useTheme } from '../../../shared/contexts/themeContext';
-import { uploadImageToCloudinary } from '../../../utils/uploadImages';
+import { uploadMediaToCloudinary } from '../../../utils/uploadImages';
 
 const EditProfile = ({ navigation }: any) => {
   const { theme } = useTheme();
@@ -54,7 +54,7 @@ const EditProfile = ({ navigation }: any) => {
 
         try {
           setUploading(true);
-          const imageUrl = await uploadImageToCloudinary(uri);
+          const imageUrl = await uploadMediaToCloudinary(uri);
           setProfileImage(imageUrl);
           setUploading(false);
           Alert.alert('Success', 'Profile image uploaded!');

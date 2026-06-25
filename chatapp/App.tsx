@@ -20,6 +20,7 @@ import { useCurrentUser } from './src/api/auth';
 import { useChatStore } from './src/shared/global/chatStore';
 import { useUserStore } from './src/shared/global/userStore';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { navigationRef } from './src/utils/rootNavigation';
 
 /* -------------------------------------------------------------------------- */
@@ -140,6 +141,7 @@ function UserSync() {
 
     setCurrentUser(currentUser);
     useChatStore.getState().setCurrentUser(currentUser._id);
+    AsyncStorage.setItem('currentUserId', currentUser._id); // ✅ persist
   }, [currentUser]);
 
   return null;

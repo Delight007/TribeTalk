@@ -20,7 +20,7 @@ async function saveFcmTokenToBackend({
 }: SaveTokenParams): Promise<void> {
   if (!userId) return;
   try {
-    await fetch('http://10.177.54.72:3000/api/save-token', {
+    await fetch('http://10.142.203.72:3000/api/save-token', {
       // adjust URL if needed
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

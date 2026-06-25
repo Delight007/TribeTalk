@@ -1,0 +1,126 @@
+fixing voiceNote
+
+# Conflicts:
+#	.gitignore
+
+# Please enter the commit message for your changes. Lines starting
+# with '#' will be ignored, and an empty message aborts the commit.
+#
+# interactive rebase in progress; onto 7e31b84
+# Last command done (1 command done):
+#    pick 4ebea09 fixing voiceNote
+# No commands remaining.
+# You are currently rebasing branch 'main' on '7e31b84'.
+#
+# Changes to be committed:
+#	new file:   .bundle/config
+#	new file:   .eslintrc.js
+#	modified:   .gitignore
+#	new file:   .prettierrc.js
+#	new file:   .watchmanconfig
+#	new file:   App.tsx
+#	new file:   Gemfile
+#	new file:   README.md
+#	new file:   __tests__/App.test.tsx
+#	new file:   android/app/build.gradle
+#	new file:   android/app/debug.keystore
+#	new file:   android/app/proguard-rules.pro
+#	new file:   android/app/src/debug/AndroidManifest.xml
+#	new file:   android/app/src/main/AndroidManifest.xml
+#	new file:   android/app/src/main/java/com/chatapp/MainActivity.kt
+#	new file:   android/app/src/main/java/com/chatapp/MainApplication.kt
+#	new file:   android/app/src/main/res/drawable/rn_edit_text_material.xml
+#	new file:   android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+#	new file:   android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+#	new file:   android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+#	new file:   android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+#	new file:   android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+#	new file:   android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+#	new file:   android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+#	new file:   android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+#	new file:   android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+#	new file:   android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+#	new file:   android/app/src/main/res/values/strings.xml
+#	new file:   android/app/src/main/res/values/styles.xml
+#	new file:   android/build.gradle
+#	new file:   android/gradle.properties
+#	new file:   android/gradle/wrapper/gradle-wrapper.jar
+#	new file:   android/gradle/wrapper/gradle-wrapper.properties
+#	new file:   android/gradlew
+#	new file:   android/gradlew.bat
+#	new file:   android/hs_err_pid10796.log
+#	new file:   android/replay_pid10796.log
+#	new file:   android/settings.gradle
+#	new file:   app.json
+#	new file:   babel.config.js
+#	new file:   env.d.ts
+#	new file:   global.css
+#	new file:   index.js
+#	new file:   ios/.xcode.env
+#	new file:   ios/Podfile
+#	new file:   ios/chatapp.xcodeproj/project.pbxproj
+#	new file:   ios/chatapp.xcodeproj/xcshareddata/xcschemes/chatapp.xcscheme
+#	new file:   ios/chatapp/AppDelegate.swift
+#	new file:   ios/chatapp/Images.xcassets/AppIcon.appiconset/Contents.json
+#	new file:   ios/chatapp/Images.xcassets/Contents.json
+#	new file:   ios/chatapp/Info.plist
+#	new file:   ios/chatapp/LaunchScreen.storyboard
+#	new file:   ios/chatapp/PrivacyInfo.xcprivacy
+#	new file:   jest.config.js
+#	new file:   metro.config.js
+#	new file:   nativewind-env.d.ts
+#	new file:   package-lock.json
+#	new file:   package.json
+#	new file:   patches/react-native-audio-recorder-player+3.6.2.patch
+#	new file:   patches/react-native-document-picker+9.3.1.patch
+#	new file:   patches/react-native-nitro-sound+0.2.10.patch
+#	new file:   postcss.config.js
+#	new file:   react-native-linear-gradient.d.ts
+#	new file:   react-native.config.js
+#	new file:   src/api/auth.ts
+#	new file:   src/api/axios.ts
+#	new file:   src/assets/logo.png
+#	new file:   src/config/firebaseConfig.ts
+#	new file:   src/domains/auth/screens/confirmationCode.tsx
+#	new file:   src/domains/auth/screens/login.tsx
+#	new file:   src/domains/auth/screens/signup.tsx
+#	new file:   src/domains/main/components/bottomNavigator.tsx
+#	new file:   src/domains/main/components/chats/chatHeader.tsx
+#	new file:   src/domains/main/components/feedPost.tsx
+#	new file:   src/domains/main/components/logout.tsx
+#	new file:   src/domains/main/components/skeleton.tsx
+#	new file:   src/domains/main/screens/charList.tsx
+#	new file:   src/domains/main/screens/chat.tsx
+#	new file:   src/domains/main/screens/editPage.tsx
+#	new file:   src/domains/main/screens/feeds.tsx
+#	new file:   src/domains/main/screens/friendList.tsx
+#	new file:   src/domains/main/screens/incomingCall.tsx
+#	new file:   src/domains/main/screens/postScreen.tsx
+#	new file:   src/domains/main/screens/previewScreen.tsx
+#	new file:   src/domains/main/screens/profile.tsx
+#	new file:   src/domains/main/screens/settings.tsx
+#	new file:   src/domains/main/screens/users.tsx
+#	new file:   src/domains/main/screens/videoCall.tsx
+#	new file:   src/domains/navigation/appNavigator.tsx
+#	new file:   src/hooks/chatList.ts
+#	new file:   src/hooks/useFCM.ts
+#	new file:   src/hooks/useFCMListener.ts
+#	new file:   src/shared/contexts/callProvider.tsx
+#	new file:   src/shared/contexts/socketIo.ts
+#	new file:   src/shared/contexts/themeContext.tsx
+#	new file:   src/shared/global/authStore.ts
+#	new file:   src/shared/global/callStore.ts
+#	new file:   src/shared/global/chatStore.ts
+#	new file:   src/shared/global/unreadMessages.ts
+#	new file:   src/shared/global/useVoicePlayerStore.ts
+#	new file:   src/shared/global/userStore.ts
+#	new file:   src/shared/types.ts
+#	new file:   src/types/navigation.ts
+#	new file:   src/utils/chatUtils.ts
+#	new file:   src/utils/rootNavigation.ts
+#	new file:   src/utils/uploadImages.ts
+#	new file:   src/utils/voiceCache.ts
+#	new file:   src/utils/voiceNotePlayer.tsx
+#	new file:   tailwind.config.js
+#	new file:   tsconfig.json
+#

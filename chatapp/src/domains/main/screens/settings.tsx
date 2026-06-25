@@ -1,4 +1,5 @@
 // SettingsScreen.tsx — logout button + cache clearing
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
 import React from 'react';
 import { Button, View } from 'react-native';
@@ -12,23 +13,30 @@ const SettingsScreen = ({ navigation }: any) => {
   const logout = useAuthStore(state => state.logout);
   const { theme } = useTheme();
   const queryClient = useQueryClient();
+const handleLogout = async () => {
+  // 1. Clear chat store
+  useChatStore.getState().clearAllChatData();
+  useChatStore.getState().setCurrentUser(undefined); // Clear currentUserId
 
-  const handleLogout = async () => {
-    // 1. Clear chat store
-    useChatStore.getState().clearAllChatData();
-    useChatStore.getState().setCurrentUser(undefined); // Clear currentUserId
+  // 2. Clear / remove all react-query cache
+  queryClient.removeQueries();
 
-    // 2. Clear / remove all react-query cache
-    queryClient.removeQueries(); // remove all queries
+  // 3. Clear user store
+  useUserStore.getState().setCurrentUser(null);
 
-    // 3️⃣ Clear user store ❗❗❗
-    useUserStore.getState().setCurrentUser(null);
+  // 4. Clear auth state
+  logout();
 
-    // 4. Clear auth state
-    logout();
+  // 5️⃣ Clear AsyncStorage
+  await AsyncStorage.removeItem('token');
+  await AsyncStorage.removeItem('currentUserId');
 
-    // 4. Navigate to login (or wherever appropriate)
-  };
+  // 6. Navigate to login
+  navigation.reset({
+    index: 0,
+    routes: [{ name: 'Login' }],
+  });
+};
 
   return (
     <LinearGradient
