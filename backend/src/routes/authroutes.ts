@@ -134,7 +134,7 @@ router.post("/resend-code", async (req: Request, res: Response) => {
     await sendEmail(
       email,
       "Your new RibeTalk verification code",
-      `Your new verification code is: ${newCode}`
+      `Your new verification code is: ${newCode}`,
     );
 
     res.json({ message: "New verification code sent to your email" });
@@ -201,7 +201,7 @@ router.post("/login", async (req: Request, res: Response) => {
 router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
   try {
     const user = await User.findById(req.userId).select(
-      "-password -__v -verificationCode -codeExpiresAt"
+      "-password -__v -verificationCode -codeExpiresAt",
     );
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -214,13 +214,21 @@ router.get("/me", authenticate, async (req: AuthRequest, res: Response) => {
 // Update user profile
 router.put("/update-profile", authenticate, async (req: any, res) => {
   try {
-    const { name, username, bio, avatar, phone, gender, dateOfBirth } =
-      req.body;
+    const {
+      name,
+      username,
+      bio,
+      avatar,
+      phone,
+      gender,
+      dateOfBirth,
+      interests,
+    } = req.body;
 
     const updatedUser = await User.findByIdAndUpdate(
       req.userId,
-      { name, username, bio, avatar, phone, gender, dateOfBirth },
-      { new: true }
+      { name, username, bio, avatar, phone, gender, dateOfBirth, interests },
+      { new: true },
     ).select("-password -__v");
 
     res.json(updatedUser);
@@ -239,7 +247,7 @@ router.get("/", authenticate, async (req: AuthRequest, res: Response) => {
 
     // Fetch all users except the current user
     const users = await User.find({ _id: { $ne: req.userId } }).select(
-      "_id name username avatar following"
+      "_id name username avatar following",
     );
 
     res.json(users);
@@ -271,7 +279,7 @@ router.post(
       console.error("Follow error:", err);
       res.status(500).json({ message: "Server error", error: err });
     }
-  }
+  },
 );
 
 /**
@@ -294,7 +302,7 @@ router.post(
       console.error("Unfollow error:", err);
       res.status(500).json({ message: "Server error", error: err });
     }
-  }
+  },
 );
 
 export default router;

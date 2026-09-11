@@ -12,6 +12,7 @@ export interface IUser extends Document {
   avatar?: string;
   phone?: string;
   gender?: string;
+  interests?: string[];
   dateOfBirth?: Date;
   following?: string[]; // 👈 users this user is following
   followers?: string[]; // 👈 users following this user
@@ -39,6 +40,7 @@ const userSchema = new Schema<IUser>(
       enum: ["Male", "Female", "Prefer not to say"],
       default: "Prefer not to say",
     },
+    interests: [{ type: String, trim: true, maxlength: 40 }],
     dateOfBirth: { type: Date },
 
     // 👇 New fields for follow feature
@@ -46,7 +48,7 @@ const userSchema = new Schema<IUser>(
     followers: [{ type: Schema.Types.ObjectId, ref: "User", default: [] }],
     fcmToken: { type: String, default: null }, // ← ADD THIS
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default mongoose.model<IUser>("User", userSchema);

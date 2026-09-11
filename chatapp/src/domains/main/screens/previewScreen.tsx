@@ -1,5 +1,4 @@
 // PreviewScreen.tsx
-
 import Ionicons from '@react-native-vector-icons/ionicons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useCallback, useRef, useState } from 'react';
@@ -20,14 +19,12 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Video, { VideoRef } from 'react-native-video';
 import { PostRequestBody, useCreatePost } from '../../../api/auth';
 import api from '../../../api/axios';
 import { RootStackParamList } from '../../../types/navigation';
-import { uploadImageToCloudinary } from '../../../utils/uploadImages';
-
+import AppVideo, { AppVideoRef } from '../../../utils/appVideo';
+import { uploadMediaToCloudinary } from '../../../utils/uploadImages';
 const { width, height } = Dimensions.get('window');
-
 type Props = NativeStackScreenProps<RootStackParamList, 'PreviewScreen'>;
 
 type MediaItem = {
@@ -49,7 +46,7 @@ interface VideoProgress {
   playableDuration: number;
   seekableDuration: number;
 }
-
+         
 interface VideoLoad {
   duration: number;
   naturalSize: {
@@ -83,7 +80,7 @@ export default function PreviewScreen({ route, navigation }: Props) {
   const createPostMutation = useCreatePost();
 
   const flatListRef = useRef<FlatList>(null);
-  const videoRef = useRef<VideoRef>(null);
+  const videoRef = useRef<AppVideoRef>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
 
   // Add tags
@@ -184,24 +181,15 @@ export default function PreviewScreen({ route, navigation }: Props) {
   const handlePost = async () => {
     try {
       setIsLoading(true);
-      // Simulate API call
-      // setTimeout(() => {
-      //   setIsLoading(false);
-      //   Alert.alert('Posted!', 'Your content has been posted successfully.', [
-      //     {
-      //       text: 'OK',
-      //       onPress: () => navigation.goBack(),
-      //     },
-      //   ]);
-      // }, 2000);
 
       // 1. Upload all selected media
       const uploadedMedia = await Promise.all(
         selectedMedia.map(async item => {
-          const url = await uploadImageToCloudinary(
+          const url = await uploadMediaToCloudinary(
             item.image.uri,
-            item.isVideo,
+            { isVideo: item.isVideo },
           );
+
           return {
             url,
             type: item.isVideo ? ('video' as const) : ('image' as const),
@@ -241,6 +229,7 @@ export default function PreviewScreen({ route, navigation }: Props) {
           onPress: () => navigation.goBack(),
         },
       ]);
+      navigation.navigate('FeedScreen');
     } catch (error) {
       Alert.alert('Error', (error as Error).message);
     } finally {
@@ -263,17 +252,16 @@ export default function PreviewScreen({ route, navigation }: Props) {
       <View style={styles.mediaContainer}>
         {item.isVideo ? (
           <View style={styles.videoContainer}>
-            <Video
+            <AppVideo
               ref={isCurrentVideo ? videoRef : null}
               source={{ uri: item.image.uri }}
               style={styles.video}
               paused={!isCurrentVideo || !isPlaying}
               controls={false}
               resizeMode="contain"
-              onProgress={onVideoProgress}
-              // onLoad={onVideoLoad}
+              onProgress={({ currentTime }) => setVideoProgress(currentTime)}
               onEnd={() => setIsPlaying(false)}
-              repeat={false}
+              repeat={true}
             />
             <View style={styles.videoOverlay}>
               <TouchableOpacity
@@ -311,7 +299,7 @@ export default function PreviewScreen({ route, navigation }: Props) {
             resizeMode="contain"
           />
         )}
-
+        
         {currentCaption ? (
           <Animated.View
             style={[
@@ -585,7 +573,7 @@ export default function PreviewScreen({ route, navigation }: Props) {
           </>
         )}
       </SafeAreaView>
-
+          
       {/* Settings Modal */}
       <Modal visible={showSettings} transparent animationType="slide">
         <View style={styles.modalContainer}>

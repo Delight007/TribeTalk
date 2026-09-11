@@ -1,6 +1,7 @@
 // src/controllers/userController.ts
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth";
+import Activity from "../models/activity";
 import User from "../models/user";
 
 // ✅ Get all users except logged-in one
@@ -9,7 +10,7 @@ export const getAllUsers = async (req: AuthRequest, res: Response) => {
     if (!req.userId) return res.status(401).json({ message: "Unauthorized" });
 
     const users = await User.find({ _id: { $ne: req.userId } }).select(
-      "-password"
+      "-password",
     );
     res.json(users);
   } catch (error) {
@@ -44,6 +45,17 @@ export const followUser = async (req: AuthRequest, res: Response) => {
     await user.save();
     await targetUser.save();
 
+    const actor = user;
+    await Activity.create({
+      recipient: targetUser._id,
+      actor: actor._id,
+      actorName: actor.name,
+      actorUsername: actor.username,
+      actorAvatar: actor.avatar,
+      type: "request",
+      message: "sent you a friend request",
+    });
+
     console.log("Follow successful:", { currentUserId, targetUserId });
     res.json({ message: "Followed successfully", targetUser }); // return targetUser for frontend
   } catch (error) {
@@ -68,10 +80,10 @@ export const unfollowUser = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: "User not found" });
 
     user.following = (user.following || []).filter(
-      (id) => id.toString() !== targetUserId
+      (id) => id.toString() !== targetUserId,
     );
     targetUser.followers = (targetUser.followers || []).filter(
-      (id) => id.toString() !== currentUserId
+      (id) => id.toString() !== currentUserId,
     );
 
     await user.save();

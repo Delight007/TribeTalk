@@ -1,6 +1,7 @@
 import { CameraRoll } from '@react-native-camera-roll/camera-roll';
 import Ionicons from '@react-native-vector-icons/ionicons';
-import { useNavigation } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -38,6 +39,7 @@ type PostScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   'PostScreen'
 >;
+type PostScreenRouteProp = RouteProp<RootStackParamList, 'PostScreen'>;
 
 const styles = StyleSheet.create({
   tabButton: {
@@ -110,8 +112,11 @@ export default function PostScreen({
 }: PostScreenProps) {
   const flatListRef = useRef<FlatList>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const route = useRoute<PostScreenRouteProp>();
 
-  const [selectedTab, setSelectedTab] = useState<MediaType>('POST');
+  const [selectedTab, setSelectedTab] = useState<MediaType>(
+    route.params?.postType ?? 'POST',
+  );
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
   const [filteredMediaFiles, setFilteredMediaFiles] = useState<any[]>([]);
   const [selectedMedia, setSelectedMedia] = useState<any[]>([]);

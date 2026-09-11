@@ -1,0 +1,7 @@
+0000000000000000000000000000000000000000 4ebea097c1f1cc851a5d3d1df2082c8f7e8e7d24 Delight007 <ganalafiyalevi@gmail.com> 1777043100 +0100	commit (initial): fixing voiceNote
+4ebea097c1f1cc851a5d3d1df2082c8f7e8e7d24 7e31b84479143105f2e5f24a0e7f5adb52f2e7eb Delight007 <ganalafiyalevi@gmail.com> 1777043182 +0100	pull origin main --rebase (start): checkout 7e31b84479143105f2e5f24a0e7f5adb52f2e7eb
+7e31b84479143105f2e5f24a0e7f5adb52f2e7eb 66d4126843bba7b612fb0433536f98e92bb5a8a5 Delight007 <ganalafiyalevi@gmail.com> 1777043522 +0100	commit: fixing voiceNote
+66d4126843bba7b612fb0433536f98e92bb5a8a5 4ebea097c1f1cc851a5d3d1df2082c8f7e8e7d24 Delight007 <ganalafiyalevi@gmail.com> 1777043659 +0100	rebase (abort): returning to refs/heads/main
+4ebea097c1f1cc851a5d3d1df2082c8f7e8e7d24 7e31b84479143105f2e5f24a0e7f5adb52f2e7eb Delight007 <ganalafiyalevi@gmail.com> 1777043669 +0100	pull --rebase origin main (start): checkout 7e31b84479143105f2e5f24a0e7f5adb52f2e7eb
+7e31b84479143105f2e5f24a0e7f5adb52f2e7eb 95adaa5908b394a03fcaf27b438977818229e2c6 Delight007 <ganalafiyalevi@gmail.com> 1777043740 +0100	rebase (continue): fixing voiceNote
+95adaa5908b394a03fcaf27b438977818229e2c6 95adaa5908b394a03fcaf27b438977818229e2c6 Delight007 <ganalafiyalevi@gmail.com> 1777043740 +0100	rebase (finish): returning to refs/heads/main

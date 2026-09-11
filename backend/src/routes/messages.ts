@@ -79,15 +79,40 @@ chatMessage.get(
       }
 
       console.log("req.userId", req.userId);
-      // 4️⃣ Fetch messages and populate sender & receiver info
+
+      // 4️⃣ Get pagination parameters
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      // 5️⃣ Fetch messages with pagination and populate sender & receiver info
       const messages = await messageModel
         .find({ chat: chatId })
         .populate("sender", "name avatar")
         .populate("receiver", "name avatar")
-        .sort({ createdAt: 1 });
+        .sort({ createdAt: -1 }) // Sort by newest first for pagination
+        .skip(offset)
+        .limit(limit);
 
-      // 5️⃣ Return messages
-      res.status(200).json(messages);
+      // 6️⃣ Transform messages for frontend security (remove sender/receiver, map to userId)
+      const transformedMessages = messages.map(msg => ({
+        _id: msg._id,
+        chatId: msg.chat,
+        type: msg.type,
+        text: msg.text,
+        mediaUrl: msg.mediaUrl,
+        fileName: msg.fileName,
+        fileSize: msg.fileSize,
+        // mimeType: msg.mimeType,
+        duration: msg.duration,
+        createdAt: msg.createdAt,
+        deliveredAt: msg.deliveredAt,
+        readAt: msg.readAt,
+        userId: msg.sender._id.toString(), // Map sender to userId for frontend
+        status: msg.delivered ? 'delivered' : 'sent',
+      }));
+
+      // 7️⃣ Return messages (reverse to show oldest first in the response)
+      res.status(200).json(transformedMessages.reverse());
     } catch (err) {
       console.error("Error fetching messages:", err);
       res.status(500).json({ error: "Failed to fetch messages" });

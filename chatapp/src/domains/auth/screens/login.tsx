@@ -51,8 +51,8 @@ const Login = ({ navigation }: any) => {
             // Use user.id or user._id depending on what the API returns
             const userId = response.user.id || response.user._id;
             if (userId) {
-              console.log('Setting current user in chat store:', userId);
               useChatStore.getState().setCurrentUser(userId);
+              await AsyncStorage.setItem('currentUserId', userId); // ✅ persist
             }
 
             Alert.alert('Success', 'Logged in successfully!');
@@ -217,11 +217,11 @@ const Login = ({ navigation }: any) => {
             </TouchableOpacity>
 
             {/* 🌗 Theme Toggle */}
-            <TouchableOpacity onPress={toggleTheme} className="mt-6">
+            {/* <TouchableOpacity onPress={toggleTheme} className="mt-6">
               <Text className="text-center text-green-600">
                 Switch to {theme === 'dark' ? 'Light' : 'Dark'} Mode
               </Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
       </SafeAreaView>

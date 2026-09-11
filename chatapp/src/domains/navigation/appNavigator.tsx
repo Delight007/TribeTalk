@@ -7,6 +7,7 @@ import { RootStackParamList } from '../../types/navigation';
 import ConfirmationCode from '../auth/screens/confirmationCode';
 import LoginScreen from '../auth/screens/login';
 import SignupScreen from '../auth/screens/signup';
+import ActivityScreen from '../main/screens/activityScreen';
 import ChatList from '../main/screens/charList';
 import ChatScreen from '../main/screens/chat';
 import EditProfile from '../main/screens/editPage';
@@ -59,6 +60,7 @@ const AppNavigator = () => {
           <Stack.Screen name="EditProfile" component={EditProfile} />
           <Stack.Screen name="AppUsers" component={AppUsers} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Activity" component={ActivityScreen} />
           <Stack.Screen name="VideoCall" component={VideoCall} />
           <Stack.Screen name="Friendlist" component={Friendlist} />
           <Stack.Screen name="PostScreen" component={PostScreen} />

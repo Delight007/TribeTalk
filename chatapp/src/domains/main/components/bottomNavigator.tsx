@@ -57,7 +57,7 @@ const BottomNavigator = ({ active }: { active?: string }) => {
         className={`w-12 h-12 rounded-full items-center justify-center shadow-lg
           ${theme === 'dark' ? 'bg-green-500' : 'bg-green-700'}
         `}
-        onPress={() => navigation.navigate('PostScreen')}
+        onPress={() => navigation.navigate('PostScreen', { postType: 'POST' })}
       >
         <Ionicons name="add" size={26} color="#ffffff" />
       </TouchableOpacity>
@@ -65,7 +65,7 @@ const BottomNavigator = ({ active }: { active?: string }) => {
       {/* Likes */}
       <TouchableOpacity
         className="items-center"
-        onPress={() => navigation.navigate('Settings')}
+        onPress={() => navigation.navigate('Activity')}
       >
         <Ionicons
           name="heart-outline"

@@ -3,6 +3,22 @@ import { useEffect, useRef } from 'react';
 import { useUserChats } from '../api/auth';
 import { ChatSummary, useChatStore } from '../shared/global/chatStore';
 
+// Helper function to get last message preview (imported from chatStore)
+const getLastMessagePreview = (msg: { type?: string; text?: string }) => {
+  switch (msg.type) {
+    case 'image':
+      return '📷 Photo';
+    case 'video':
+      return '🎥 Video';
+    case 'document':
+      return '📄 Document';
+    case 'voice':
+      return '🎤 Voice message';
+    default:
+      return msg.text ?? '';
+  }
+};
+
 export default function ChatListLoader() {
   const currentUserId = useChatStore(state => state.currentUserId);
   const {
@@ -58,8 +74,14 @@ export default function ChatListLoader() {
 
       // Store to your chatStore summaries
       chats.forEach((chat: ChatSummary) => {
-        const lastMessage =
-          (chat as any).lastMessage ?? (chat as any).latestMessage ?? 'Say hi!';
+        // Use message type to determine display text
+        const messageType = (chat as any).latestMessageType;
+        const messageText = (chat as any).latestMessage ?? (chat as any).lastMessage;
+
+        const lastMessage = messageType
+          ? getLastMessagePreview({ type: messageType, text: messageText })
+          : messageText ?? 'Say hi!';
+
         const lastMessageAt =
           (chat as any).lastMessageAt ??
           (chat as any).latestMessageCreatedAt ??

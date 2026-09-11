@@ -73,6 +73,31 @@ export const useCurrentUser = () => {
   });
 };
 
+export type Activity = {
+  _id: string;
+  type: 'like' | 'comment' | 'request' | 'mention';
+  actorName: string;
+  actorAvatar?: string;
+  message: string;
+  postImage?: string;
+  read: boolean;
+  createdAt: string;
+};
+
+export const useActivities = () =>
+  useQuery<Activity[], Error>({
+    queryKey: ['activities'],
+    queryFn: async () => {
+      const { data } = await api.get('/activities');
+      return data.activities ?? [];
+    },
+    refetchOnReconnect: true,
+  });
+
+export const markActivitiesRead = async () => {
+  await api.post('/activities/read');
+};
+
 // ----------------------
 // UPDATE USER PROFILE
 // ----------------------
@@ -146,42 +171,68 @@ export const useUnfollowUser = () => {
 // };
 
 // 🟦 Get all messages for a chat
-export const useChatMessages = (chatId?: string) => {
+export const useChatMessages = (
+  chatId?: string,
+  limit: number = 50,
+  offset: number = 0,
+) => {
   return useQuery({
-    queryKey: ['messages', chatId],
+    queryKey: ['messages', chatId, limit, offset],
     queryFn: async () => {
-      const { data } = await api.get(`/chatMessages/${chatId}`);
+      const { data } = await api.get(
+        `/chatMessages/${chatId}?limit=${limit}&offset=${offset}`,
+      );
       return data;
     },
     enabled: !!chatId,
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 };
 
-// 🟨 Send a new message
+type SendMessagePayload = {
+  sender: string;
+  receiver: string;
+  type: 'text' | 'image' | 'video' | 'document' | 'voice';
+  text?: string; // for text
+  mediaUrl?: string; // for all media types
+  fileName?: string; // for document
+  fileSize?: number; // for document
+  duration?: number; // for voice
+};
+
 export const useSendMessage = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payload: {
-      sender: string;
-      receiver: string;
-      text: string;
-    }) => {
-      const { sender, receiver, text } = payload; // destructure correctly
+    mutationFn: async (payload: SendMessagePayload) => {
+      const {
+        sender,
+        receiver,
+        type,
+        text,
+        mediaUrl,
+        fileName,
+        fileSize,
+        duration,
+      } = payload;
 
       const { data } = await api.post('/messages', {
-        sender, // match backend field names
+        sender,
         receiver,
+        type,
         text,
+        mediaUrl,
+        fileName,
+        fileSize,
+        duration,
       });
 
       return data;
     },
     onSuccess: newMessage => {
       queryClient.invalidateQueries({
-        queryKey: ['messages', newMessage.chat], // invalidate the chat messages query
+        queryKey: ['messages', newMessage.chat],
       });
     },
   });
@@ -254,7 +305,7 @@ type MediaType = 'image' | 'video';
 
 // Body of the post request
 export type PostRequestBody = {
-  type: string;
+  type: 'feed' | 'story' | 'reel';
   media: { url: string; type: MediaType }[];
   caption?: string;
   tags?: string[];
@@ -283,10 +334,10 @@ export const useCreatePost = () => {
 
       queryClient.invalidateQueries({ queryKey: ['posts', { type }] });
 
-      queryClient.setQueryData(['posts', { type }], (oldData: any) => ({
-        ...oldData,
-        posts: [response.data, ...(oldData?.posts ?? [])],
-      }));
+      queryClient.setQueryData<PostType[]>(['posts', { type }], oldData => [
+        response.data as unknown as PostType,
+        ...(oldData ?? []),
+      ]);
     },
     onError: (err: Error) => {
       console.error('Create post error', err.message);
@@ -306,6 +357,7 @@ export const useCreatePost = () => {
 
 type PostType = {
   _id: string;
+  author?: string | { _id?: string; id?: string; $oid?: string };
   name: string;
   username: string;
   avatar?: string;
@@ -316,15 +368,104 @@ type PostType = {
   caption?: string;
   tags?: string[];
   likes: any[];
+  bookmarks?: any[];
   commentsCount: number;
 };
+
+export type FeedPost = PostType;
 
 export const usePosts = () =>
   useQuery<PostType[], Error>({
     queryKey: ['posts', { type: 'feed' }],
     queryFn: async () => {
       const res = await api.get('/posts?type=feed');
-      return res.data.posts;
+      return Array.isArray(res.data) ? res.data : (res.data?.posts ?? []);
     },
+    select: data =>
+      Array.isArray(data)
+        ? data
+        : Array.isArray((data as any)?.posts)
+          ? (data as any).posts
+          : [],
     staleTime: 1000 * 60,
   });
+
+export const useUserPosts = (userId?: string) =>
+  useQuery<PostType[], Error>({
+    queryKey: ['posts', { type: 'feed', author: userId }],
+    queryFn: async () => {
+      const res = await api.get(`/posts?type=feed&author=${userId}`);
+      return Array.isArray(res.data) ? res.data : (res.data?.posts ?? []);
+    },
+    enabled: Boolean(userId),
+    staleTime: 1000 * 60,
+  });
+
+export const useStories = () =>
+  useQuery<FeedPost[], Error>({
+    queryKey: ['posts', { type: 'story' }],
+    queryFn: async () => {
+      const res = await api.get('/posts?type=story&limit=50');
+      return Array.isArray(res.data) ? res.data : (res.data?.posts ?? []);
+    },
+    select: data =>
+      Array.isArray(data)
+        ? data
+        : Array.isArray((data as any)?.posts)
+          ? (data as any).posts
+          : [],
+    staleTime: 1000 * 60,
+  });
+
+export type PostComment = {
+  _id: string;
+  author: string;
+  name: string;
+  username?: string;
+  avatar?: string;
+  text: string;
+  createdAt: string;
+};
+
+export const useTogglePostLike = () =>
+  useMutation({
+    mutationFn: async (postId: string) => {
+      const { data } = await api.post(`/posts/${postId}/like`);
+      return data as { liked: boolean; likesCount: number };
+    },
+  });
+
+export const useTogglePostBookmark = () =>
+  useMutation({
+    mutationFn: async (postId: string) => {
+      const { data } = await api.post(`/posts/${postId}/bookmark`);
+      return data as { bookmarked: boolean };
+    },
+  });
+
+export const usePostComments = (postId: string, enabled = true) =>
+  useQuery<PostComment[]>({
+    queryKey: ['postComments', postId],
+    queryFn: async () => {
+      const { data } = await api.get(`/posts/${postId}/comments`);
+      return data.comments;
+    },
+    enabled,
+  });
+
+export const useAddPostComment = (postId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (text: string) => {
+      const { data } = await api.post(`/posts/${postId}/comments`, { text });
+      return data.comment as PostComment;
+    },
+    onSuccess: comment => {
+      queryClient.setQueryData<PostComment[]>(
+        ['postComments', postId],
+        comments => [...(comments ?? []), comment],
+      );
+    },
+  });
+};

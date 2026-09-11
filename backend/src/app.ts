@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import { errorHandler } from "./middleware/error.middleware";
+import activityRouter from "./routes/activityRoutes";
 import agoraTokenRouter from "./routes/agoraTokenRoute";
 import authRouter from "./routes/authroutes";
 import chatRouter from "./routes/chatRoutes";
@@ -27,6 +28,7 @@ app.use("/api/messages", messageRouter);
 app.use("/api/chatMessages", chatMessage);
 app.use("/api/friends", friendsrouter);
 app.use("/api/unreadMessages", unreadMessages);
+app.use("/api/activities", activityRouter);
 app.use("/api/save-token", fcmRoutes);
 app.use("/api/send-notification", sendNotificationRouter);
 app.use("/api/posts", postRouters);

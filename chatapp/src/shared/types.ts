@@ -11,6 +11,7 @@ export interface User {
   avatar?: string;
   phone?: string;
   gender?: string;
+  interests?: string[];
   dateOfBirth?: Date;
   following?: string[]; // 👈 users this user is following
   followers?: string[]; // 👈 users following this user
