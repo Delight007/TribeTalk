@@ -1,6 +1,6 @@
-
 import Ionicons from '@react-native-vector-icons/ionicons';
-import React, { useRef, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -11,52 +11,96 @@ import {
   View,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { usePosts } from '../../../api/auth';
+import { useCurrentUser, usePosts, useStories } from '../../../api/auth';
 import { useTheme } from '../../../shared/contexts/themeContext';
 import BottomNavigator from '../components/bottomNavigator';
 import FeedPost from '../components/feedPost';
 import SkeletonPostCard from '../components/skeleton';
-
-const stories = [
-  { id: 1, name: 'My story', image: 'https://i.pravatar.cc/150?img=1' },
-  { id: 2, name: 'Kelly', image: 'https://i.pravatar.cc/150?img=2' },
-  { id: 3, name: 'Adrian', image: 'https://i.pravatar.cc/150?img=3' },
-  { id: 4, name: 'Bianca', image: 'https://i.pravatar.cc/150?img=4' },
-  { id: 5, name: 'James', image: 'https://i.pravatar.cc/150?img=5' },
-];
+import StoryViewer from '../components/storyViewer';
 
 export default function FeedScreen() {
   const { theme, toggleTheme } = useTheme();
   const { data: posts, isLoading, isError, refetch } = usePosts();
-const [visibleSet, setVisibleSet] = useState(new Set());
+  const { data: currentUser } = useCurrentUser();
+  const { data: stories = [], refetch: refetchStories } = useStories();
+  const navigation = useNavigation<any>();
+  const [visibleSet, setVisibleSet] = useState(new Set());
   const [refreshing, setRefreshing] = useState(false);
   const [likedPosts, setLikedPosts] = useState<string[]>([]);
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<string[]>([]);
   const [muted, setMuted] = useState(true);
+  const [storyIndex, setStoryIndex] = useState<number | null>(null);
 
-
-   const visibleIds = useRef(new Set());
-
+  const visibleIds = useRef(new Set());
 
   const viewabilityConfig = useRef({
-  itemVisiblePercentThreshold: 60,
-});
+    itemVisiblePercentThreshold: 60,
+  });
 
-const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-  const newSet = new Set(
-    viewableItems.map((v: any) => v.item._id)
-  );
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    const newSet = new Set(viewableItems.map((v: any) => v.item._id));
 
-  visibleIds.current = newSet;
-  setVisibleSet(newSet); 
-});
+    visibleIds.current = newSet;
+    setVisibleSet(newSet);
+  });
 
-  
-  
   const postsList = Array.isArray(posts)
     ? posts
     : Array.isArray((posts as any)?.data)
       ? (posts as any).data
       : [];
+  const feedPosts = postsList.filter((post: any) => post.type === 'feed');
+
+  const currentUserId = currentUser?._id ?? currentUser?.id;
+
+  const getStoredId = (value: any) =>
+    typeof value === 'string'
+      ? value
+      : (value?._id ?? value?.id ?? value?.$oid);
+
+  const storyGroups = useMemo(() => {
+    const groups = new Map<string, any>();
+
+    const storyList = Array.isArray(stories) ? stories : [];
+    storyList.forEach(story => {
+      const ownerId = getStoredId(story.author) ?? story.username ?? story._id;
+      const existing = groups.get(ownerId);
+      if (existing) {
+        existing.media = [...existing.media, ...story.media];
+      } else {
+        groups.set(ownerId, { ...story, media: [...story.media] });
+      }
+    });
+
+    return Array.from(groups.values()).sort((first, second) => {
+      const firstIsCurrent = getStoredId(first.author) === currentUserId;
+      const secondIsCurrent = getStoredId(second.author) === currentUserId;
+      return Number(secondIsCurrent) - Number(firstIsCurrent);
+    });
+  }, [stories, currentUserId]);
+
+  useEffect(() => {
+    if (!currentUserId || !postsList.length) return;
+
+    setLikedPosts(
+      postsList
+        .filter((post: any) =>
+          (post.likes ?? []).some(
+            (like: any) => getStoredId(like) === currentUserId,
+          ),
+        )
+        .map((post: any) => post._id),
+    );
+    setBookmarkedPosts(
+      postsList
+        .filter((post: any) =>
+          (post.bookmarks ?? []).some(
+            (bookmark: any) => getStoredId(bookmark) === currentUserId,
+          ),
+        )
+        .map((post: any) => post._id),
+    );
+  }, [currentUserId, postsList]);
 
   const toggleLike = (postId: string) => {
     setLikedPosts(prev =>
@@ -66,7 +110,13 @@ const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
     );
   };
 
- 
+  const toggleBookmark = (postId: string) => {
+    setBookmarkedPosts(prev =>
+      prev.includes(postId)
+        ? prev.filter(id => id !== postId)
+        : [...prev, postId],
+    );
+  };
 
   return (
     <LinearGradient
@@ -77,25 +127,23 @@ const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
       }
       className="flex-1"
     >
-
       {isLoading && (
-          <>
-            <SkeletonPostCard />
-            <SkeletonPostCard />
-          </>
-        )}
+        <>
+          <SkeletonPostCard />
+          <SkeletonPostCard />
+        </>
+      )}
 
-        {isError && (
-          <View className="py-8 items-center">
-            <Text className="text-red-500">Failed to load posts</Text>
-          </View>
-        )}
+      {isError && (
+        <View className="py-8 items-center">
+          <Text className="text-red-500">Failed to load posts</Text>
+        </View>
+      )}
 
       {/* Header */}
       <View
         className={`absolute top-0 left-0 right-0 z-10 px-4 pt-6 pb-3
           ${theme === 'dark' ? 'border-gray-700 bg-[#09261e]/80' : 'border-gray-300 bg-[#d3f9d8]/80'}`}
-        
       >
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center">
@@ -139,9 +187,9 @@ const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
       </View>
 
       <FlatList
-  data={postsList}
-        keyExtractor={(item) => item._id}
-        showsVerticalScrollIndicator={false}  
+        data={feedPosts}
+        keyExtractor={item => item._id}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: 90 }}
         refreshControl={
           <RefreshControl
@@ -149,60 +197,95 @@ const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
             onRefresh={async () => {
               setRefreshing(true);
               await refetch();
+              await refetchStories();
               setRefreshing(false);
             }}
-          /> 
+          />
         }
-       renderItem={({ item }) => (
-       <FeedPost
-      post={item}
-      theme={theme}
-      isVisible={visibleSet.has(item._id)}
-      muted={muted}
-      toggleMute={() => setMuted(!muted)}
-      isLiked={likedPosts.includes(item._id)}
-      toggleLike={toggleLike}
-    />
-  )}
-  ListHeaderComponent={
-    <>
-        {/* STORIES */}
-        <View
-          className={`flex-row items-center p-3 border-b ${
-            theme === 'dark' ? 'border-gray-700' : 'border-gray-300'
-          }`}
-        >
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {stories.map(story => (
-              <View key={story.id} className="items-center mr-4">
-                <View
-                  className={`border-2 rounded-full p-1 ${
-                    theme === 'dark' ? 'border-green-500' : 'border-green-600'
-                  }`}
+        renderItem={({ item }) => (
+          <FeedPost
+            post={item}
+            theme={theme}
+            isVisible={visibleSet.has(item._id)}
+            muted={muted}
+            toggleMute={() => setMuted(!muted)}
+            currentUserId={currentUserId}
+            isLiked={likedPosts.includes(item._id)}
+            toggleLike={toggleLike}
+            isBookmarked={bookmarkedPosts.includes(item._id)}
+            toggleBookmark={toggleBookmark}
+          />
+        )}
+        ListHeaderComponent={
+          <>
+            {/* STORIES */}
+            <View
+              className={`flex-row items-center p-3 border-b ${
+                theme === 'dark' ? 'border-gray-700' : 'border-gray-300'
+              }`}
+            >
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <TouchableOpacity
+                  className="mr-4 items-center"
+                  onPress={() =>
+                    navigation.navigate('PostScreen', { postType: 'STORY' })
+                  }
                 >
-                  <Image
-                    source={{ uri: story.image }}
-                    className="w-16 h-16 rounded-full"
-                  />
-                </View>
-                <Text
-                  className={`text-xs mt-1 ${
-                    theme === 'dark' ? 'text-white' : 'text-gray-800'
-                  }`}
-                >
-                  {story.name}
-                </Text>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-    </>
-  }
-  onViewableItemsChanged={onViewableItemsChanged.current}
-  viewabilityConfig={viewabilityConfig.current}
-/>
+                  <View className="h-16 w-16 items-center justify-center rounded-full border-2 border-dashed border-green-600">
+                    <Ionicons name="add" size={28} color="#16a34a" />
+                  </View>
+                  <Text
+                    className={`mt-1 text-xs ${
+                      theme === 'dark' ? 'text-white' : 'text-gray-800'
+                    }`}
+                  >
+                    Add story
+                  </Text>
+                </TouchableOpacity>
+                {storyGroups.map((story, index) => (
+                  <TouchableOpacity
+                    key={story._id}
+                    className="mr-4 items-center"
+                    onPress={() => setStoryIndex(index)}
+                  >
+                    <View
+                      className={`border-2 rounded-full p-1 ${
+                        theme === 'dark'
+                          ? 'border-green-500'
+                          : 'border-green-600'
+                      }`}
+                    >
+                      <Image
+                        source={{ uri: story.avatar }}
+                        className="w-16 h-16 rounded-full"
+                      />
+                    </View>
+                    <Text
+                      className={`text-xs mt-1 ${
+                        theme === 'dark' ? 'text-white' : 'text-gray-800'
+                      }`}
+                    >
+                      {getStoredId(story.author) === currentUserId
+                        ? 'Your story'
+                        : story.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </>
+        }
+        onViewableItemsChanged={onViewableItemsChanged.current}
+        viewabilityConfig={viewabilityConfig.current}
+      />
 
       <BottomNavigator active="home" />
+      <StoryViewer
+        stories={storyGroups}
+        initialIndex={storyIndex ?? 0}
+        visible={storyIndex !== null}
+        onClose={() => setStoryIndex(null)}
+      />
     </LinearGradient>
   );
 }

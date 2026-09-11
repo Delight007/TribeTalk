@@ -28,6 +28,8 @@ const EditProfile = ({ navigation }: any) => {
   const [username, setUsername] = useState('');
   const [bio, setBio] = useState('');
   const [gender, setGender] = useState('Prefer not to say');
+  const [interests, setInterests] = useState<string[]>([]);
+  const [interestInput, setInterestInput] = useState('');
 
   // 🧠 Populate fields when user data loads
   useEffect(() => {
@@ -37,6 +39,7 @@ const EditProfile = ({ navigation }: any) => {
       setBio(currentUser.bio || '');
       setProfileImage(currentUser.avatar || null);
       setGender(currentUser.gender || 'Prefer not to say');
+      setInterests(currentUser.interests || []);
     }
   }, [currentUser]);
 
@@ -74,6 +77,7 @@ const EditProfile = ({ navigation }: any) => {
         bio,
         gender,
         avatar: profileImage,
+        interests,
       });
       Alert.alert('Success', 'Profile updated successfully!');
       navigation.goBack();
@@ -199,6 +203,70 @@ const EditProfile = ({ navigation }: any) => {
             <TouchableOpacity className="mb-6">
               <Text className="text-[#0095F6] text-base">Add link</Text>
             </TouchableOpacity>
+
+            <Text
+              className={`mb-2 text-sm ${
+                theme === 'dark' ? 'text-gray-300' : 'text-gray-700'
+              }`}
+            >
+              Interests
+            </Text>
+            <View className="mb-3 flex-row flex-wrap gap-2">
+              {interests.map(interest => (
+                <TouchableOpacity
+                  key={interest}
+                  onPress={() =>
+                    setInterests(current =>
+                      current.filter(item => item !== interest),
+                    )
+                  }
+                  className="flex-row items-center rounded-full bg-green-600 px-3 py-2"
+                >
+                  <Text className="text-sm font-semibold text-white">
+                    {interest}
+                  </Text>
+                  <Ionicons
+                    name="close"
+                    size={14}
+                    color="#fff"
+                    style={{ marginLeft: 5 }}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+            <View className="mb-6 flex-row items-center">
+              <TextInput
+                value={interestInput}
+                onChangeText={setInterestInput}
+                onSubmitEditing={() => {
+                  const value = interestInput.trim();
+                  if (value && !interests.includes(value)) {
+                    setInterests(current => [...current, value]);
+                  }
+                  setInterestInput('');
+                }}
+                placeholder="Add an interest"
+                placeholderTextColor={theme === 'dark' ? '#9ca3af' : '#6b7280'}
+                className={`mr-2 flex-1 rounded-full px-4 py-3 ${
+                  theme === 'dark'
+                    ? 'bg-[#1a2a22] text-white'
+                    : 'bg-zinc-200 text-black'
+                }`}
+                returnKeyType="done"
+              />
+              <TouchableOpacity
+                onPress={() => {
+                  const value = interestInput.trim();
+                  if (value && !interests.includes(value)) {
+                    setInterests(current => [...current, value]);
+                  }
+                  setInterestInput('');
+                }}
+                className="h-11 w-11 items-center justify-center rounded-full bg-green-600"
+              >
+                <Ionicons name="add" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               className="flex-row justify-between items-center mb-6"

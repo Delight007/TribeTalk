@@ -42,10 +42,12 @@ import {
 import { RootStackParamList } from '../../../types/navigation';
 import Video from '../../../utils/appVideo';
 import { uploadMediaToCloudinary } from '../../../utils/uploadImages';
-import { formatVoiceDuration } from '../../../utils/voiceAudio';
-import VoiceNotePlayer from '../../../utils/voiceNotePlayer';
+import { useVoicePlayerSetup } from '../../../utils/voice/useVoicePlayerSetup';
+import { formatVoiceDuration } from '../../../utils/voice/voiceAudio';
+import { downloadVoiceFile } from '../../../utils/voice/voiceCache';
 import ChatHeader from '../components/chats/chatHeader';
-import VoiceWaveform from '../components/VoiceWaveform';
+import VoiceNotePlayer from '../components/voice/voiceNotePlayer';
+import VoiceWaveform from '../components/voice/VoiceWaveform';
 
 type ChatScreenRouteProp = RouteProp<RootStackParamList, 'ChatScreen'>;
 type ChatScreenNavigationProp = NativeStackNavigationProp<
@@ -230,6 +232,7 @@ const MediaLoader: React.FC<MediaLoaderProps> = ({
 export default function ChatScreen() {
   const route = useRoute<ChatScreenRouteProp>();
   const navigation = useNavigation<ChatScreenNavigationProp>();
+  useVoicePlayerSetup();
   const { theme } = useTheme();
   const isDark = theme === 'dark';
   const { data: currentUser } = useCurrentUser();
@@ -362,6 +365,7 @@ export default function ChatScreen() {
     markMessagesRead,
     currentRoomId,
     setCurrentUser,
+    updateLocalUri,
   } = useChatStore();
 
   const {
@@ -456,12 +460,18 @@ export default function ChatScreen() {
   const handleVoiceNotePressOut = async () => {
     if (!isRecording) return;
 
+    console.log('[VOICE] finger released:', Date.now());
+
     recordingCooldownRef.current = true;
+
     setTimeout(() => {
       recordingCooldownRef.current = false;
     }, 500);
 
     const result = await stopRecording();
+
+    console.log('[VOICE] recorder stopped:', Date.now(), result?.duration);
+
     if (!result) return;
 
     const { uri: recordPath, duration, waveform } = result;
@@ -820,27 +830,40 @@ export default function ChatScreen() {
   // Get messages for this room
   const roomMessages = allMessages[roomId] || [];
 
+  const pendingVoiceMessages = React.useMemo(
+    () =>
+      roomMessages
+        .filter(msg => msg.type === 'voice' && msg.mediaUrl && !msg.localUri)
+        .sort(
+          (a, b) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        ),
+    [roomMessages],
+  );
   // ⬇️ Add this right after you define roomMessages
-  // useEffect(() => {
-  //   const downloadVoiceMessages = async () => {
-  //     const roomMsgs = roomMessages; // messages for this chat
+  useEffect(() => {
+    if (pendingVoiceMessages.length === 0) return;
 
-  //     for (const msg of roomMsgs) {
-  //       if (msg.type === 'voice' && msg.mediaUrl && !msg.localUri) {
-  //         const localPath = await downloadVoiceFile(msg.mediaUrl);
-  //         if (localPath) {
-  //           // Update the message in the store with a local path
-  //           useChatStore.getState().replaceLocalMessage(roomId, msg._id, {
-  //             ...msg,
-  //             localUri: localPath,
-  //           });
-  //         }
-  //       }
-  //     }
-  //   };
+    let cancelled = false;
 
-  //   downloadVoiceMessages();
-  // }, [roomMessages, roomId]);
+    const downloadVoiceMessages = async () => {
+      for (const msg of pendingVoiceMessages) {
+        if (cancelled) break;
+
+        const localPath = await downloadVoiceFile(msg.mediaUrl!);
+
+        if (localPath) {
+          updateLocalUri(roomId, msg._id!, localPath);
+        }
+      }
+    };
+
+    downloadVoiceMessages();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [roomId, pendingVoiceMessages]);
 
   // Create uploading message objects
   const uploadingMessageObjects = Object.entries(uploadingMessages).map(
@@ -1070,6 +1093,7 @@ export default function ChatScreen() {
             className={`my-1 max-w-[80%] ${isMe ? 'self-end' : 'self-start'}`}
           >
             <VoiceNotePlayer
+              roomId={roomId}
               messageId={item._id || 'uploading-voice'}
               uri=""
               isMe={isMe}
@@ -1443,6 +1467,7 @@ export default function ChatScreen() {
                     isAnimating={isRecording}
                     playedColor="#16a34a"
                     unplayedColor={isDark ? '#14532d' : '#bbf7d0'}
+                    progress={0}
                   />
                 </View>
 

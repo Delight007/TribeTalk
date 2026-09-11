@@ -53,9 +53,12 @@ export const VOICE_RECORDING_OPTIONS: AudioSet = {
   AudioSourceAndroid: AudioSourceAndroidType.MIC,
   OutputFormatAndroid: OutputFormatAndroidType.MPEG_4,
   AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
-  AudioSamplingRate: 44100,
+
+  // Let Android choose the supported sample rate.
+  // Do not force 44100Hz: it is causing your file timeline to be wrong.
   AudioChannels: 1,
   AudioEncodingBitRate: 128000,
+
   AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
   AVNumberOfChannelsKeyIOS: 1,
   AVFormatIDKeyIOS: 'aac',
@@ -63,6 +66,21 @@ export const VOICE_RECORDING_OPTIONS: AudioSet = {
 
 // --- Recording (keep your existing implementation) ---
 export type RecordBackCallback = (e: RecordBackType) => void;
+
+// export async function startRecorder(
+//   uri?: string,
+//   onProgress?: RecordBackCallback,
+// ): Promise<string> {
+//   try {
+//     await arp.stopRecorder();
+//   } catch (_) {
+//     // Ignore
+//   }
+//   if (onProgress) {
+//     arp.addRecordBackListener(onProgress);
+//   }
+//   return arp.startRecorder(uri, VOICE_RECORDING_OPTIONS, true);
+// }
 
 export async function startRecorder(
   uri?: string,
@@ -73,6 +91,7 @@ export async function startRecorder(
   } catch (_) {
     // Ignore
   }
+  arp.setSubscriptionDuration(0.1); // fires onProgress every ~100ms, same as playback
   if (onProgress) {
     arp.addRecordBackListener(onProgress);
   }
@@ -103,7 +122,7 @@ export async function createPlayer(uri: string, onProgress: PlayBackCallback) {
   await destroyPlayer();
 
   // Smooth progress updates
-  arp.setSubscriptionDuration(100);
+  arp.setSubscriptionDuration(0.1);
 
   // Register playback listener
   currentPlaybackListener = onProgress;
@@ -111,7 +130,6 @@ export async function createPlayer(uri: string, onProgress: PlayBackCallback) {
   arp.addPlayBackListener((e: PlayBackType) => {
     onProgress(e);
   });
-
   // Start playback
   await arp.startPlayer(uri);
 

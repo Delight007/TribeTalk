@@ -71,13 +71,13 @@ export interface Message {
   fileSize?: number;
   mimeType?: string;
   duration?: number;
-  waveform?: number[]; // local UI-only amplitude bars for voice notes
+  waveform?: number[];
   createdAt: string;
-  localUri?: string; // new: local cache path for voice
+  localUri?: string;
   deliveredAt?: string | null;
   readAt?: string | null;
   status?: 'pending' | 'sent' | 'delivered';
-  userId: string; // <--- ID of the sender
+  userId: string;
 }
 
 export interface FriendInfo {
@@ -198,11 +198,12 @@ export const useChatStore = create<ChatState>()(
               fileSize: payload.fileSize,
               mimeType: payload.mimeType,
               duration: payload.duration,
+              waveform: payload.waveform,
               createdAt: payload.createdAt,
               deliveredAt: payload.deliveredAt ?? null,
               readAt: payload.readAt ?? null,
               status: payload.delivered ? 'delivered' : 'sent',
-              userId: payload.userId, // <-- Add this line
+              userId: payload.userId,
             };
 
             get().addMessage(msg, payload.friend);
@@ -375,11 +376,13 @@ export const useChatStore = create<ChatState>()(
               },
             };
           const old = existing[idx];
+
           const updated = [...existing];
           updated[idx] = {
             ...serverMsg,
             localUri: old.localUri ?? serverMsg.localUri,
             waveform: old.waveform ?? serverMsg.waveform,
+            duration: serverMsg.duration ?? old.duration,
           };
           return { messages: { ...state.messages, [roomId]: updated } };
         });

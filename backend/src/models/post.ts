@@ -49,6 +49,16 @@ export interface IPost extends Document {
   tags?: string[];
 
   likes: Types.ObjectId[];
+  bookmarks: Types.ObjectId[];
+  comments: {
+    _id?: Types.ObjectId;
+    author: Types.ObjectId;
+    name: string;
+    username?: string;
+    avatar?: string;
+    text: string;
+    createdAt: Date;
+  }[];
   commentsCount: number;
 
   // Story-specific field
@@ -79,11 +89,22 @@ const PostSchema = new Schema<IPost>(
     tags: [String],
 
     likes: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    bookmarks: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    comments: [
+      {
+        author: { type: Schema.Types.ObjectId, ref: "User", required: true },
+        name: { type: String, required: true },
+        username: String,
+        avatar: String,
+        text: { type: String, required: true, trim: true, maxlength: 1000 },
+        createdAt: { type: Date, default: Date.now },
+      },
+    ],
     commentsCount: { type: Number, default: 0 },
 
     expiresAt: Date,
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 export default model<IPost>("Post", PostSchema);

@@ -41,6 +41,7 @@ export type RootStackParamList = {
   EditProfile: undefined;
   AppUsers: undefined;
   Settings: undefined;
+  Activity: undefined;
   VideoCall: {
     channel: string;
     token: string;
@@ -50,6 +51,6 @@ export type RootStackParamList = {
     withUserName: string;
   };
   Friendlist: undefined;
-  PostScreen: undefined;
+  PostScreen: { postType?: MediaType } | undefined;
   PreviewScreen: { selectedMedia: MediaItem[]; postType: MediaType }; // ← add this
 };
